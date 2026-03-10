@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JSON Toolbox - Minificar y Formatear</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap");
+
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      .font-mono {
+        font-family: "JetBrains Mono", monospace;
+      }
+      /* Custom scrollbar for JSON output */
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 4px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-50 text-slate-900 min-h-screen">
+    <div class="max-w-4xl mx-auto p-4 md:p-8 space-y-8">
+      <!-- Header -->
+      <header class="space-y-2 border-b border-slate-200 pb-6">
+        <div class="flex items-center gap-3">
+          <div class="p-2 bg-blue-600/10 rounded-lg">
+            <i data-lucide="file-json" class="w-8 h-8 text-blue-600"></i>
+          </div>
+          <h1 class="text-3xl font-bold tracking-tight">JSON Toolbox</h1>
+        </div>
+        <p class="text-slate-500">
+          Minifica tu JSON a una línea o formatéalo para que sea legible de
+          forma local.
+        </p>
+      </header>
+
+      <main class="grid gap-6">
+        <!-- Input Section -->
+        <div class="space-y-4">
+          <div class="flex justify-between items-center">
+            <label for="jsonInput" class="text-sm font-semibold"
+              >JSON de entrada</label
+            >
+            <span id="charCount" class="text-xs text-slate-400 font-mono"
+              >0 caracteres</span
+            >
+          </div>
+
+          <textarea
+            id="jsonInput"
+            placeholder='{"key": "value", "example": [1, 2, 3]}'
+            class="w-full min-h-[250px] p-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-mono text-sm resize-y"
+          ></textarea>
+
+          <!-- Error Message -->
+          <div
+            id="errorMessage"
+            class="hidden flex items-center gap-2 text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-100"
+          >
+            <i data-lucide="alert-circle" class="w-4 h-4"></i>
+            <span id="errorText">Formato JSON inválido.</span>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex flex-wrap gap-3">
+            <button
+              onclick="processJson('minify')"
+              class="inline-flex items-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm cursor-pointer"
+            >
+              <i data-lucide="minimize" class="w-4 h-4 mr-2"></i>
+              Minificar
+            </button>
+            <button
+              onclick="processJson('format')"
+              class="inline-flex items-center px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg transition-colors shadow-sm cursor-pointer"
+            >
+              <i data-lucide="align-left" class="w-4 h-4 mr-2"></i>
+              Formatear
+            </button>
+            <button
+              onclick="clearAll()"
+              class="inline-flex items-center px-5 py-2.5 text-slate-500 hover:text-red-600 text-sm font-medium rounded-lg transition-colors cursor-pointer"
+            >
+              <i data-lucide="eraser" class="w-4 h-4 mr-2"></i>
+              Limpiar todo
+            </button>
+          </div>
+        </div>
+
+        <!-- Result Section -->
+        <div
+          id="resultContainer"
+          class="hidden space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300"
+        >
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold">Resultado</h2>
+            <button
+              id="copyButton"
+              onclick="copyResult()"
+              class="inline-flex items-center px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-md transition-all cursor-pointer"
+            >
+              <i data-lucide="clipboard" class="w-3.5 h-3.5 mr-2"></i>
+              <span id="copyBtnText">Copiar</span>
+            </button>
+          </div>
+          <div class="relative">
+            <pre
+              id="jsonOutput"
+              class="p-4 rounded-xl bg-slate-900 text-blue-100 text-xs font-mono overflow-auto max-h-[500px] custom-scrollbar break-all whitespace-pre-wrap shadow-lg border border-slate-800"
+            ></pre>
+          </div>
+        </div>
+      </main>
+
+      <footer
+        class="text-center pt-10 text-slate-400 text-xs border-t border-slate-200"
+      >
+        Esta herramienta funciona 100% en tu navegador. Tus datos son privados.
+      </footer>
+    </div>
+
+    <script>
+      // Initialize Lucide icons
+      lucide.createIcons();
+
+      const jsonInput = document.getElementById("jsonInput");
+      const charCount = document.getElementById("charCount");
+      const errorMessage = document.getElementById("errorMessage");
+      const errorText = document.getElementById("errorText");
+      const resultContainer = document.getElementById("resultContainer");
+      const jsonOutput = document.getElementById("jsonOutput");
+      const copyBtnText = document.getElementById("copyBtnText");
+      const copyButton = document.getElementById("copyButton");
+
+      /**
+       * Update character count on input
+       */
+      jsonInput.addEventListener("input", () => {
+        charCount.textContent = `${jsonInput.value.length} caracteres`;
+        if (errorMessage.classList.contains("hidden") === false) {
+          errorMessage.classList.add("hidden");
+        }
+      });
+
+      /**
+       * Core logic to minify or format
+       */
+      function processJson(mode) {
+        const rawValue = jsonInput.value.trim();
+
+        if (!rawValue) {
+          showError("Por favor, ingresa un contenido JSON.");
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(rawValue);
+          let result = "";
+
+          if (mode === "minify") {
+            result = JSON.stringify(parsed);
+          } else {
+            result = JSON.stringify(parsed, null, 2);
+          }
+
+          jsonOutput.textContent = result;
+          resultContainer.classList.remove("hidden");
+          errorMessage.classList.add("hidden");
+
+          // Scroll into view if output just appeared
+          resultContainer.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+          });
+        } catch (e) {
+          showError("JSON inválido: " + e.message);
+          resultContainer.classList.add("hidden");
+        }
+      }
+
+      /**
+       * Display error messages
+       */
+      function showError(message) {
+        errorText.textContent = message;
+        errorMessage.classList.remove("hidden");
+      }
+
+      /**
+       * Clear all inputs and state
+       */
+      function clearAll() {
+        jsonInput.value = "";
+        jsonOutput.textContent = "";
+        charCount.textContent = "0 caracteres";
+        resultContainer.classList.add("hidden");
+        errorMessage.classList.add("hidden");
+      }
+
+      /**
+       * Copy result to clipboard with visual feedback
+       */
+      function copyResult() {
+        const text = jsonOutput.textContent;
+        if (!text) return;
+
+        // Environment compatible copy
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+
+        try {
+          document.execCommand("copy");
+
+          // UI Feedback
+          copyBtnText.textContent = "Copiado";
+          copyButton.classList.add("bg-green-100", "text-green-700");
+
+          setTimeout(() => {
+            copyBtnText.textContent = "Copiar";
+            copyButton.classList.remove("bg-green-100", "text-green-700");
+          }, 2000);
+        } catch (err) {
+          console.error("Error al copiar", err);
+        }
+
+        document.body.removeChild(textArea);
+      }
+    </script>
+  </body>
+</html>

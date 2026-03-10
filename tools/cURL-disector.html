@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>cURL & JWT Dissector</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar for a cleaner look */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans selection:bg-blue-100 p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto space-y-6">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight text-slate-900">cURL Dissector</h1>
+                <p class="text-slate-500 text-sm">Analiza, edita y reconstruye peticiones de red complejas</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-medium text-slate-400 bg-slate-200 px-2 py-1 rounded">v3.0 (Vanilla)</span>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Left Column: Editor -->
+            <div class="lg:col-span-7 space-y-6">
+                
+                <!-- 1. Raw Input -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-slate-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                        <h3 class="text-sm font-semibold text-slate-700 uppercase tracking-wider">Comando cURL Raw</h3>
+                    </div>
+                    <div class="p-4">
+                        <textarea id="rawInput" placeholder="Pega tu comando 'curl ...' aquí" class="w-full h-40 p-3 font-mono text-xs bg-slate-900 text-slate-100 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/50 resize-none transition-all"></textarea>
+                    </div>
+                </div>
+
+                <!-- 2. URL & Method -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-slate-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                        <h3 class="text-sm font-semibold text-slate-700 uppercase tracking-wider">URL de Petición</h3>
+                    </div>
+                    <div class="p-4 flex gap-2">
+                        <select id="methodInput" class="bg-slate-100 border-none rounded-lg px-3 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer">
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                            <option value="PATCH">PATCH</option>
+                        </select>
+                        <input id="urlInput" type="text" placeholder="https://api.example.com/v1/..." class="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono text-blue-600 focus:bg-white outline-none transition-all">
+                    </div>
+                </div>
+
+                <!-- 3. Headers -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-4 h-4 text-slate-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            <h3 id="headersTitle" class="text-sm font-semibold text-slate-700 uppercase tracking-wider">Headers (0)</h3>
+                        </div>
+                    </div>
+                    <div class="p-4 space-y-2" id="headersList">
+                        <!-- Dynamic headers -->
+                    </div>
+                    <div class="px-4 pb-4">
+                        <button onclick="addHeader()" class="text-[10px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 py-2 cursor-pointer">
+                            + AÑADIR HEADER
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 4. Cookies -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-4 h-4 text-slate-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5Z"/><path d="M8.5 8.5v.01"/><path d="M16 15.5v.01"/><path d="M12 12v.01"/><path d="M11 17v.01"/><path d="M7 14v.01"/></svg>
+                            <h3 id="cookiesTitle" class="text-sm font-semibold text-slate-700 uppercase tracking-wider">Cookies (0)</h3>
+                        </div>
+                    </div>
+                    <div class="p-4 space-y-2" id="cookiesList">
+                        <!-- Dynamic cookies -->
+                    </div>
+                    <div class="px-4 pb-4">
+                        <button onclick="addCookie()" class="text-[10px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 py-2 cursor-pointer">
+                            + AÑADIR COOKIE
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Column: Preview -->
+            <div class="lg:col-span-5 space-y-6">
+                <div class="sticky top-6 space-y-6">
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+                            <svg class="w-4 h-4 text-slate-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                            <h3 class="text-sm font-semibold text-slate-700 uppercase tracking-wider">cURL Reconstruido</h3>
+                        </div>
+                        <div class="p-4 relative group">
+                            <pre id="outputCurl" class="p-4 bg-slate-900 text-slate-300 rounded-lg text-[11px] font-mono overflow-x-auto leading-relaxed h-[400px] whitespace-pre-wrap"></pre>
+                            <button id="copyBtn" onclick="handleCopy()" class="absolute top-6 right-6 p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-md transition-all flex items-center gap-2 cursor-pointer shadow-lg">
+                                <svg id="copyIcon" class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                <span id="copyText" class="text-[10px] font-bold">COPIAR</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Help Card -->
+                    <div class="bg-blue-600 rounded-xl p-6 text-white shadow-lg shadow-blue-100">
+                        <h4 class="font-bold text-lg mb-2">Cómo funciona</h4>
+                        <ul class="text-sm text-blue-500 bg-white/10 rounded-lg p-4 space-y-2 list-none">
+                            <li class="flex gap-2 text-white">
+                                <span class="font-bold opacity-50">1.</span>
+                                Pega un comando cURL desde DevTools.
+                            </li>
+                            <li class="flex gap-2 text-white">
+                                <span class="font-bold opacity-50">2.</span>
+                                Decodifica JWTs detectados automáticamente.
+                            </li>
+                            <li class="flex gap-2 text-white">
+                                <span class="font-bold opacity-50">3.</span>
+                                Edita cualquier campo para actualizar el comando final.
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        /**
+         * State Management
+         */
+        let state = {
+            url: '',
+            method: 'GET',
+            headers: [],
+            cookies: []
+        };
+
+        /**
+         * Utility Functions
+         */
+
+        const parseCurl = (input) => {
+            const result = { url: '', method: 'GET', headers: [], cookies: [] };
+            if (!input.trim().startsWith('curl')) return result;
+
+            const urlMatch = input.match(/curl\s+['"]?([^'"]\S+)['"]?/i) || input.match(/['"](https?:\/\/[^'"]+)['"]/i);
+            if (urlMatch) result.url = urlMatch[1];
+
+            const headerMatches = [...input.matchAll(/-H\s+['"]([^'"]+)['"]/g)];
+            headerMatches.forEach(m => {
+                const [key, ...valParts] = m[1].split(':');
+                if (key && valParts) {
+                    result.headers.push({ key: key.trim(), value: valParts.join(':').trim() });
+                }
+            });
+
+            const cookieMatches = [...input.matchAll(/-b\s+['"]([^'"]+)['"]/g)];
+            cookieMatches.forEach(m => {
+                m[1].split(';').forEach(p => {
+                    const [key, ...valParts] = p.split('=');
+                    if (key) result.cookies.push({ key: key.trim(), value: valParts.join('=').trim() });
+                });
+            });
+
+            const cookieHeaderIndex = result.headers.findIndex(h => h.key.toLowerCase() === 'cookie');
+            if (cookieHeaderIndex !== -1) {
+                result.headers[cookieHeaderIndex].value.split(';').forEach(p => {
+                    const [key, ...valParts] = p.split('=');
+                    if (key) result.cookies.push({ key: key.trim(), value: valParts.join('=').trim() });
+                });
+                result.headers.splice(cookieHeaderIndex, 1);
+            }
+
+            const methodMatch = input.match(/-X\s+(\w+)/i);
+            if (methodMatch) result.method = methodMatch[1].toUpperCase();
+
+            return result;
+        };
+
+        const generateCurl = () => {
+            let cmd = `curl '${state.url}' \\\n  -X ${state.method}`;
+            state.headers.forEach(h => {
+                if (h.key && h.value) cmd += ` \\\n  -H '${h.key}: ${h.value}'`;
+            });
+            if (state.cookies.length > 0) {
+                const cookieStr = state.cookies.map(c => `${c.key}=${c.value}`).join('; ');
+                cmd += ` \\\n  -b '${cookieStr}'`;
+            }
+            return cmd;
+        };
+
+        const isJwt = (token) => typeof token === 'string' && token.split('.').length === 3;
+
+        const decodeJwt = (token) => {
+            try {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                return JSON.parse(jsonPayload);
+            } catch (e) { return null; }
+        };
+
+        /**
+         * DOM Syncing
+         */
+
+        const render = () => {
+            // Update inputs
+            document.getElementById('methodInput').value = state.method;
+            document.getElementById('urlInput').value = state.url;
+            document.getElementById('outputCurl').textContent = generateCurl();
+
+            // Headers
+            document.getElementById('headersTitle').textContent = `Headers (${state.headers.length})`;
+            const hList = document.getElementById('headersList');
+            hList.innerHTML = '';
+            state.headers.forEach((h, i) => hList.appendChild(createRow('headers', i, h.key, h.value)));
+
+            // Cookies
+            document.getElementById('cookiesTitle').textContent = `Cookies (${state.cookies.length})`;
+            const cList = document.getElementById('cookiesList');
+            cList.innerHTML = '';
+            state.cookies.forEach((c, i) => cList.appendChild(createRow('cookies', i, c.key, c.value)));
+        };
+
+        const createRow = (type, index, key, value) => {
+            const container = document.createElement('div');
+            container.className = 'flex flex-col gap-2 p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all group';
+            
+            const inputsDiv = document.createElement('div');
+            inputsDiv.className = 'flex gap-2 items-center';
+
+            const keyInput = document.createElement('input');
+            keyInput.className = 'w-1/3 bg-slate-50 border border-slate-200 rounded px-2 py-1.5 text-xs font-bold outline-none focus:bg-white focus:ring-1 focus:ring-blue-100';
+            keyInput.value = key;
+            keyInput.oninput = (e) => { state[type][index].key = e.target.value; syncOutput(); };
+
+            const valInput = document.createElement('input');
+            valInput.className = 'flex-1 bg-slate-50 border border-slate-200 rounded px-2 py-1.5 text-xs font-mono outline-none focus:bg-white focus:ring-1 focus:ring-blue-100';
+            valInput.value = value;
+            valInput.oninput = (e) => { state[type][index].value = e.target.value; syncOutput(); };
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'p-1.5 text-slate-300 hover:text-red-500 cursor-pointer opacity-0 group-hover:opacity-100';
+            deleteBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+            deleteBtn.onclick = () => { state[type].splice(index, 1); render(); };
+
+            inputsDiv.append(keyInput, valInput, deleteBtn);
+            container.append(inputsDiv);
+
+            if (isJwt(value)) {
+                const jwtContainer = document.createElement('div');
+                jwtContainer.className = 'mt-1 bg-indigo-50/50 border border-indigo-100 rounded overflow-hidden';
+                
+                const toggleBtn = document.createElement('button');
+                toggleBtn.className = 'w-full flex items-center gap-2 px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 cursor-pointer text-left uppercase';
+                toggleBtn.innerHTML = '<span>▶</span> Ver Payload JWT';
+                
+                const pre = document.createElement('pre');
+                pre.className = 'hidden p-2 text-[10px] font-mono text-indigo-900 bg-white border-t border-indigo-100 overflow-x-auto';
+                pre.textContent = JSON.stringify(decodeJwt(value), null, 2);
+
+                toggleBtn.onclick = () => {
+                    const isHidden = pre.classList.contains('hidden');
+                    pre.classList.toggle('hidden', !isHidden);
+                    toggleBtn.querySelector('span').textContent = isHidden ? '▼' : '▶';
+                };
+
+                jwtContainer.append(toggleBtn, pre);
+                container.append(jwtContainer);
+            }
+
+            return container;
+        };
+
+        const syncOutput = () => {
+            document.getElementById('outputCurl').textContent = generateCurl();
+        };
+
+        const addHeader = () => { state.headers.push({ key: '', value: '' }); render(); };
+        const addCookie = () => { state.cookies.push({ key: '', value: '' }); render(); };
+
+        const handleCopy = () => {
+            const cmd = generateCurl();
+            const textArea = document.createElement("textarea");
+            textArea.value = cmd;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                const btnText = document.getElementById('copyText');
+                const btnIcon = document.getElementById('copyIcon');
+                btnText.textContent = '¡COPIADO!';
+                btnIcon.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>';
+                btnIcon.classList.add('text-green-400');
+                setTimeout(() => {
+                    btnText.textContent = 'COPIAR';
+                    btnIcon.innerHTML = '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>';
+                    btnIcon.classList.remove('text-green-400');
+                }, 2000);
+            } catch (err) {}
+            document.body.removeChild(textArea);
+        };
+
+        /**
+         * Listeners
+         */
+        document.getElementById('rawInput').oninput = (e) => {
+            const parsed = parseCurl(e.target.value);
+            if (parsed.url) {
+                state = parsed;
+                render();
+            }
+        };
+
+        document.getElementById('methodInput').onchange = (e) => { state.method = e.target.value; syncOutput(); };
+        document.getElementById('urlInput').oninput = (e) => { state.url = e.target.value; syncOutput(); };
+
+        // Init empty
+        render();
+    </script>
+</body>
+</html>

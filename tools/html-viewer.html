@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HTML Viewer App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* Custom scrollbar for textarea */
+      textarea::-webkit-scrollbar {
+        width: 8px;
+      }
+      textarea::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      textarea::-webkit-scrollbar-thumb {
+        background-color: #d4d4d8;
+        border-radius: 20px;
+      }
+    </style>
+  </head>
+  <body class="relative h-screen w-full overflow-hidden bg-white font-sans">
+    <!-- HTML Render Container -->
+    <div class="h-full w-full">
+      <iframe
+        id="previewFrame"
+        title="HTML Preview"
+        class="h-full w-full border-none bg-white"
+        sandbox="allow-scripts allow-same-origin"
+      ></iframe>
+    </div>
+
+    <!-- Floating Action Button to open Drawer -->
+    <div class="absolute bottom-6 right-6 z-40">
+      <button
+        id="fabBtn"
+        class="inline-flex items-center justify-center rounded-full bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 shadow-lg transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 h-14 w-14"
+        aria-label="Open HTML Editor"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polyline points="16 18 22 12 16 6"></polyline>
+          <polyline points="8 6 2 12 8 18"></polyline>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Drawer Backdrop -->
+    <div
+      id="backdrop"
+      class="fixed inset-0 z-50 bg-black/80 transition-opacity duration-300 pointer-events-none opacity-0"
+      aria-hidden="true"
+    ></div>
+
+    <!-- Bottom Drawer Component -->
+    <div
+      id="drawer"
+      class="fixed inset-x-0 bottom-0 z-50 flex h-[75vh] flex-col rounded-t-[10px] border border-zinc-200 bg-white shadow-lg transition-transform duration-300 ease-in-out translate-y-full"
+    >
+      <!-- Drawer Drag Handle (Visual only) -->
+      <div class="mx-auto mt-4 h-1.5 w-[50px] rounded-full bg-zinc-300"></div>
+
+      <div class="flex flex-1 flex-col overflow-hidden px-4 pb-6 pt-4 sm:px-6">
+        <div class="flex items-center justify-between pb-4">
+          <div>
+            <h2 class="text-lg font-semibold text-zinc-900">Editor HTML</h2>
+            <p class="text-sm text-zinc-500">
+              Pega tu código aquí y presiona aplicar para ver los cambios.
+            </p>
+          </div>
+          <button
+            id="closeBtn"
+            class="inline-flex items-center justify-center rounded-full hover:bg-zinc-100 hover:text-zinc-900 text-zinc-900 h-8 w-8 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-hidden py-2">
+          <textarea
+            id="htmlInput"
+            class="flex h-full w-full resize-none rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm font-mono shadow-sm placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+            placeholder="<html>...</html>"
+            spellcheck="false"
+          ></textarea>
+        </div>
+
+        <div class="flex justify-end pt-4 gap-2">
+          <button
+            id="cancelBtn"
+            class="inline-flex items-center justify-center rounded-md border border-zinc-200 bg-transparent hover:bg-zinc-100 text-zinc-900 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 h-9 px-4 py-2"
+          >
+            Cancelar
+          </button>
+          <button
+            id="applyBtn"
+            class="inline-flex items-center justify-center rounded-md bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 shadow text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 h-9 px-4 py-2"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="mr-2"
+            >
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Aplicar Cambios
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Initial HTML template
+      const initialHtml =
+        "<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: sans-serif; text-align: center; margin-top: 50px; }\n    h1 { color: #333; }\n  </style>\n</head>\n<body>\n  <h1>¡Hola Mundo!</h1>\n  <p>Pega tu código HTML en el editor de abajo.</p>\n</body>\n</html>";
+
+      // DOM Elements
+      const previewFrame = document.getElementById("previewFrame");
+      const backdrop = document.getElementById("backdrop");
+      const drawer = document.getElementById("drawer");
+      const fabBtn = document.getElementById("fabBtn");
+      const closeBtn = document.getElementById("closeBtn");
+      const cancelBtn = document.getElementById("cancelBtn");
+      const applyBtn = document.getElementById("applyBtn");
+      const htmlInput = document.getElementById("htmlInput");
+
+      // State management
+      let appliedHtml = initialHtml;
+
+      // Initialize iframe with default HTML
+      previewFrame.srcdoc = appliedHtml;
+
+      // Open drawer and sync draft state
+      const openDrawer = () => {
+        htmlInput.value = appliedHtml;
+        backdrop.classList.remove("pointer-events-none", "opacity-0");
+        backdrop.classList.add("opacity-100");
+        drawer.classList.remove("translate-y-full");
+        drawer.classList.add("translate-y-0");
+      };
+
+      // Close drawer
+      const closeDrawer = () => {
+        backdrop.classList.add("pointer-events-none", "opacity-0");
+        backdrop.classList.remove("opacity-100");
+        drawer.classList.add("translate-y-full");
+        drawer.classList.remove("translate-y-0");
+      };
+
+      // Apply changes to iframe and close drawer
+      const applyChanges = () => {
+        appliedHtml = htmlInput.value;
+        previewFrame.srcdoc = appliedHtml;
+        closeDrawer();
+      };
+
+      // Event Listeners
+      fabBtn.addEventListener("click", openDrawer);
+      closeBtn.addEventListener("click", closeDrawer);
+      cancelBtn.addEventListener("click", closeDrawer);
+      backdrop.addEventListener("click", closeDrawer);
+      applyBtn.addEventListener("click", applyChanges);
+    </script>
+  </body>
+</html>

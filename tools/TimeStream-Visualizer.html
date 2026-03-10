@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analizador Universal de Tiempo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .bar-transition {
+            transition: height 0.3s ease, y 0.3s ease;
+        }
+        .tooltip {
+            pointer-events: none;
+            transition: opacity 0.2s;
+            backdrop-filter: blur(4px);
+        }
+        /* Custom scrollbar for better look */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen p-4 md:p-8 font-sans">
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+                <h1 class="text-4xl font-black bg-gradient-to-r from-blue-400 via-indigo-400 to-emerald-400 bg-clip-text text-transparent">
+                    TimeStream Visualizer
+                </h1>
+                <p class="text-slate-400 mt-2 font-medium">Soporta Epochs (s, ms, μs) e ISO 8601 en listas sucias.</p>
+            </div>
+            <div class="flex gap-2">
+                <button id="sampleDataBtn" class="px-4 py-2 text-xs font-bold uppercase tracking-wider bg-slate-800 hover:bg-slate-700 rounded-lg transition-all border border-slate-700">
+                    Cargar Ejemplo Mixto
+                </button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Sidebar: Controls -->
+            <div class="lg:col-span-4 xl:col-span-3 space-y-6">
+                <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-3 tracking-widest">Entrada de Datos</label>
+                    <textarea 
+                        id="epochInput" 
+                        class="w-full h-64 bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs font-mono focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 focus:outline-none transition-all resize-none"
+                        placeholder="Pega aquí:
+1709932800
+2024-03-08T12:00:00Z
+  1709932800000  
+1709932800000000"
+                    ></textarea>
+                    
+                    <button 
+                        id="generateBtn"
+                        class="w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-900/20 transition-all transform active:scale-[0.98]"
+                    >
+                        Procesar y Graficar
+                    </button>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-3 tracking-widest">Agrupación Temporal</label>
+                        <select id="groupingSelect" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500/50 outline-none cursor-pointer">
+                            <option value="day">Vista por Día</option>
+                            <option value="week">Vista por Semana</option>
+                            <option value="month">Vista por Mes</option>
+                        </select>
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-800">
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-3 tracking-widest">Resumen de Carga</label>
+                        <div id="statsPanel" class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-slate-400">Total válidos:</span>
+                                <span id="countStat" class="text-sm font-mono text-emerald-400 font-bold">-</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-slate-400">ISO 8601:</span>
+                                <span id="isoStat" class="text-sm font-mono text-blue-400">-</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-slate-400">Epochs:</span>
+                                <span id="epochStat" class="text-sm font-mono text-indigo-400">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main: Chart -->
+            <div class="lg:col-span-8 xl:col-span-9 bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl min-h-[600px] flex flex-col relative overflow-hidden">
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Histograma de Frecuencia</h2>
+                        <p id="rangeSub" class="text-xs text-slate-500 mt-1 uppercase tracking-tighter"></p>
+                    </div>
+                </div>
+                
+                <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-slate-600 z-0 transition-opacity">
+                    <svg class="w-16 h-16 mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    <span class="italic font-medium">Esperando datos de entrada...</span>
+                </div>
+
+                <div id="chartContainer" class="relative flex-grow w-full h-full flex items-end z-10">
+                    <!-- SVG Chart -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tooltip -->
+    <div id="chartTooltip" class="tooltip fixed opacity-0 bg-slate-900/90 text-white px-4 py-3 rounded-xl shadow-2xl text-xs z-50 border border-slate-700 pointer-events-none ring-1 ring-white/10"></div>
+
+    <script>
+        /**
+         * Advanced Parsing Logic
+         */
+        const epochInput = document.getElementById('epochInput');
+        const generateBtn = document.getElementById('generateBtn');
+        const groupingSelect = document.getElementById('groupingSelect');
+        const chartContainer = document.getElementById('chartContainer');
+        const emptyState = document.getElementById('emptyState');
+        const chartTooltip = document.getElementById('chartTooltip');
+
+        let currentData = [];
+
+        /**
+         * Parses and cleans input: Handles mixed lists, newlines, spaces, s, ms, μs and ISO 8601
+         */
+        const parseInput = (input) => {
+            // Split by comma or newline, then trim each item
+            const rawTokens = input.split(/[\n,]+/).map(v => v.trim()).filter(v => v !== '');
+            
+            let isoCount = 0;
+            let epochCount = 0;
+            const msTimestamps = [];
+
+            rawTokens.forEach(token => {
+                // 1. Try ISO 8601 / Date String first if it looks like one (contains - or :)
+                if (/[a-zA-Z-]/.test(token) || token.includes(':')) {
+                    const date = new Date(token);
+                    if (!isNaN(date.getTime())) {
+                        msTimestamps.push(date.getTime());
+                        isoCount++;
+                        return;
+                    }
+                }
+
+                // 2. Try Numeric Epoch
+                const num = parseFloat(token);
+                if (!isNaN(num)) {
+                    let ts = num;
+                    const len = token.replace(/[\.\s]/g, '').length;
+                    
+                    // Intelligent Precision Detection based on digit length
+                    if (len <= 11) { // Seconds (e.g. 1709932800)
+                        ts = num * 1000;
+                    } else if (len <= 14) { // Milliseconds (e.g. 1709932800000)
+                        ts = num;
+                    } else { // Microseconds (e.g. 1709932800000000)
+                        ts = num / 1000;
+                    }
+                    
+                    if (!isNaN(ts)) {
+                        msTimestamps.push(ts);
+                        epochCount++;
+                    }
+                }
+            });
+
+            // Update Stats UI
+            document.getElementById('countStat').textContent = msTimestamps.length;
+            document.getElementById('isoStat').textContent = isoCount;
+            document.getElementById('epochStat').textContent = epochCount;
+
+            return msTimestamps.sort((a, b) => a - b);
+        };
+
+        const groupData = (data, period) => {
+            const groups = {};
+            data.forEach(ms => {
+                const date = new Date(ms);
+                let key;
+                if (period === 'day') {
+                    key = date.toISOString().split('T')[0];
+                } else if (period === 'week') {
+                    const d = new Date(date);
+                    const day = d.getDay();
+                    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+                    d.setDate(diff);
+                    key = d.toISOString().split('T')[0];
+                } else if (period === 'month') {
+                    key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                }
+                groups[key] = (groups[key] || 0) + 1;
+            });
+            return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
+        };
+
+        const renderChart = () => {
+            const period = groupingSelect.value;
+            const bins = groupData(currentData, period);
+            
+            if (bins.length === 0) {
+                emptyState.style.opacity = '1';
+                chartContainer.innerHTML = '';
+                return;
+            }
+            
+            emptyState.style.opacity = '0';
+            const containerWidth = chartContainer.clientWidth;
+            const containerHeight = chartContainer.clientHeight || 500;
+            const padding = { top: 40, right: 30, bottom: 60, left: 50 };
+            
+            const maxCount = Math.max(...bins.map(b => b[1]));
+            const chartW = containerWidth - padding.left - padding.right;
+            const chartH = containerHeight - padding.top - padding.bottom;
+            const barWidth = chartW / bins.length;
+
+            let svgHtml = `<svg width="${containerWidth}" height="${containerHeight}" class="overflow-visible">`;
+            
+            // Defs for gradients
+            svgHtml += `
+                <defs>
+                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#60a5fa" />
+                        <stop offset="100%" stop-color="#3b82f6" />
+                    </linearGradient>
+                </defs>
+            `;
+
+            // Grid y labels
+            const gridCount = 5;
+            for (let i = 0; i <= gridCount; i++) {
+                const y = padding.top + (i * chartH / gridCount);
+                const val = Math.round(maxCount - (i * maxCount / gridCount));
+                svgHtml += `
+                    <line x1="${padding.left}" y1="${y}" x2="${containerWidth - padding.right}" y2="${y}" stroke="#1e293b" stroke-width="1" />
+                    <text x="${padding.left - 10}" y="${y + 4}" fill="#475569" font-size="11" text-anchor="end" font-weight="bold">${val}</text>
+                `;
+            }
+
+            // Bars
+            bins.forEach(([label, count], i) => {
+                const h = (count / maxCount) * chartH;
+                const gap = Math.max(2, barWidth * 0.1);
+                const x = padding.left + (i * barWidth) + gap;
+                const w = Math.max(1, barWidth - (gap * 2));
+                const y = containerHeight - padding.bottom - h;
+
+                svgHtml += `
+                    <rect 
+                        class="bar-transition cursor-pointer hover:fill-emerald-400"
+                        x="${x}" 
+                        y="${y}" 
+                        width="${w}" 
+                        height="${h}" 
+                        rx="${Math.min(w/2, 4)}"
+                        fill="url(#barGradient)"
+                        onmousemove="showTooltip(event, '${label}', ${count})"
+                        onmouseout="hideTooltip()"
+                    />
+                `;
+
+                // X labels
+                const step = Math.ceil(bins.length / 12);
+                if (i % step === 0) {
+                    svgHtml += `
+                        <text 
+                            x="${x + w/2}" 
+                            y="${containerHeight - padding.bottom + 25}" 
+                            fill="#64748b" 
+                            font-size="10" 
+                            text-anchor="middle"
+                            font-weight="500"
+                        >
+                            ${label}
+                        </text>
+                    `;
+                }
+            });
+
+            svgHtml += '</svg>';
+            chartContainer.innerHTML = svgHtml;
+            
+            if (currentData.length > 0) {
+                const first = new Date(currentData[0]).toLocaleDateString();
+                const last = new Date(currentData[currentData.length-1]).toLocaleDateString();
+                document.getElementById('rangeSub').textContent = `${first} — ${last}`;
+            }
+        };
+
+        window.showTooltip = (e, label, count) => {
+            chartTooltip.innerHTML = `
+                <div class="text-slate-500 font-bold mb-1 uppercase tracking-tighter" style="font-size: 9px">Periodo</div>
+                <div class="text-blue-400 font-mono text-sm mb-2">${label}</div>
+                <div class="flex items-baseline gap-2">
+                    <span class="text-lg font-black text-white">${count}</span>
+                    <span class="text-slate-500 font-medium">registros</span>
+                </div>
+            `;
+            chartTooltip.style.opacity = '1';
+            
+            // Bound check for tooltip
+            let x = e.clientX + 20;
+            if (x + 150 > window.innerWidth) x = e.clientX - 170;
+            
+            chartTooltip.style.left = x + 'px';
+            chartTooltip.style.top = (e.clientY - 60) + 'px';
+        };
+
+        window.hideTooltip = () => {
+            chartTooltip.style.opacity = '0';
+        };
+
+        generateBtn.addEventListener('click', () => {
+            currentData = parseInput(epochInput.value);
+            renderChart();
+        });
+
+        groupingSelect.addEventListener('change', () => {
+            if (currentData.length > 0) renderChart();
+        });
+
+        document.getElementById('sampleDataBtn').addEventListener('click', () => {
+            const now = Date.now();
+            const samples = [];
+            // Random Epochs in different formats
+            for (let i = 0; i < 50; i++) {
+                const offset = Math.random() * 60 * 24 * 60 * 60 * 1000;
+                const ts = now - offset;
+                const rand = Math.random();
+                if (rand < 0.25) samples.push(`  ${Math.floor(ts / 1000)}  `); // Sec with spaces
+                else if (rand < 0.5) samples.push(ts); // Ms
+                else if (rand < 0.75) samples.push(ts * 1000); // Micros
+                else samples.push(new Date(ts).toISOString()); // ISO 8601
+            }
+            epochInput.value = samples.join('\n');
+            generateBtn.click();
+        });
+
+        window.addEventListener('resize', () => {
+            if (currentData.length > 0) renderChart();
+        });
+    </script>
+</body>
+</html>
