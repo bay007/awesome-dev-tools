@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prisma Schema Visualizer</title>
+    <!-- Use Tailwind v4 via CDN as requested -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Vis-Network for interactive/draggable diagrams instead of Mermaid -->
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+</head>
+<body class="bg-gray-50 h-screen w-full font-sans overflow-hidden text-gray-900">
+
+    <div class="flex h-full w-full">
+        <!-- Left Panel: Code Editor -->
+        <div class="w-1/3 flex flex-col p-4 border-r border-gray-200 bg-white shadow-sm z-10">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-lg font-bold text-gray-800">schema.prisma</h2>
+                <button id="renderBtn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium cursor-pointer shadow-sm">
+                    Visualize
+                </button>
+            </div>
+            <textarea 
+                id="schemaInput" 
+                class="flex-1 p-3 border border-gray-300 rounded-md font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 whitespace-pre"
+                spellcheck="false"
+                placeholder="Paste your Prisma schema here..."
+            >
+model User {
+  id    Int     @id @default(autoincrement())
+  email String  @unique
+  name  String?
+  posts Post[]
+}
+
+model Post {
+  id        Int     @id @default(autoincrement())
+  title     String
+  content   String?
+  published Boolean @default(false)
+  author    User    @relation(fields: [authorId], references: [id])
+  authorId  Int
+}
+
+model Category {
+  id    Int    @id @default(autoincrement())
+  name  String
+  posts Post[]
+}
+            </textarea>
+        </div>
+
+        <!-- Right Panel: Diagram Preview -->
+        <div class="w-2/3 p-4 flex flex-col bg-gray-50">
+            <h2 class="text-lg font-bold mb-3 text-gray-800">Diagram Preview (Draggable)</h2>
+            <div 
+                id="diagramContainer" 
+                class="flex-1 bg-white border border-gray-200 rounded-md shadow-inner overflow-hidden relative"
+            >
+                <div id="placeholder" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <p class="text-gray-400">Click "Visualize" to render diagram.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const schemaInput = document.getElementById('schemaInput');
+        const diagramContainer = document.getElementById('diagramContainer');
+        const renderBtn = document.getElementById('renderBtn');
+        let network = null;
+
+        /**
+         * Parses Prisma schema string into Vis-Network format and calculates proper cardinalities
+         */
+        function parsePrismaToGraph(schema) {
+            let cleanSchema = schema.replace(/\/\/.*$/gm, '');
+            const models = {};
+            const nodes = [];
+            const edges = [];
+            const relationsMap = {};
+
+            const modelRegex = /model\s+(\w+)\s*\{([^}]+)\}/g;
+            let modelMatch;
+
+            // Extract models and fields
+            while ((modelMatch = modelRegex.exec(cleanSchema)) !== null) {
+                const modelName = modelMatch[1];
+                const body = modelMatch[2];
+                models[modelName] = [];
+
+                const lines = body.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('@@'));
+
+                lines.forEach(line => {
+                    const parts = line.split(/\s+/);
+                    if (parts.length >= 2) {
+                        models[modelName].push({ name: parts[0], type: parts[1] });
+                    }
+                });
+            }
+
+            // Generate Nodes and map Relations
+            for (const [modelName, fields] of Object.entries(models)) {
+                // Format label for node using markdown syntax for bold
+                let label = `*${modelName}*\n`;
+                label += '-'.repeat(modelName.length + 4) + '\n';
+                fields.forEach(f => {
+                    label += `${f.name}: ${f.type}\n`;
+                });
+
+                nodes.push({
+                    id: modelName,
+                    label: label,
+                    shape: 'box',
+                    font: { multi: 'md', align: 'left', face: 'monospace', size: 14 },
+                    color: { background: '#f8fafc', border: '#cbd5e1' },
+                    margin: 10
+                });
+
+                // Find relations to determine cardinality
+                fields.forEach(f => {
+                    const cleanType = f.type.replace(/\[\]|\?/g, '');
+                    if (models[cleanType] && cleanType !== modelName) {
+                        const isArray = f.type.endsWith('[]');
+                        const entities = [modelName, cleanType].sort();
+                        const relationKey = `${entities[0]}-${entities[1]}`;
+                        
+                        // Initialize relation tracking if not exists
+                        if (!relationsMap[relationKey]) {
+                            relationsMap[relationKey] = {
+                                modelA: entities[0],
+                                modelB: entities[1],
+                                aIsArray: false,
+                                bIsArray: false
+                            };
+                        }
+
+                        // Register array status for the specific side of the relation
+                        if (modelName === entities[0]) {
+                            if (isArray) relationsMap[relationKey].aIsArray = true;
+                        } else {
+                            if (isArray) relationsMap[relationKey].bIsArray = true;
+                        }
+                    }
+                });
+            }
+
+            // Generate Edges based on mapped Cardinalities
+            Object.values(relationsMap).forEach(rel => {
+                let label = '';
+                let arrows = '';
+
+                if (rel.aIsArray && rel.bIsArray) {
+                    label = 'N : M';
+                    arrows = 'to, from';
+                } else if (rel.aIsArray && !rel.bIsArray) {
+                    // modelA has Many modelB, so modelA is '1' and modelB is 'N'
+                    label = '1 : N';
+                    arrows = 'to'; // Arrow points to the 'Many' side (modelB)
+                } else if (!rel.aIsArray && rel.bIsArray) {
+                    // modelB has Many modelA, so modelA is 'N' and modelB is '1'
+                    label = 'N : 1';
+                    arrows = 'from'; // Arrow points to the 'Many' side (modelA)
+                } else {
+                    label = '1 : 1';
+                    arrows = ''; // No arrows for 1:1, or you can configure 'to, from'
+                }
+
+                edges.push({
+                    from: rel.modelA,
+                    to: rel.modelB,
+                    label: label,
+                    font: { align: 'horizontal', size: 14, color: '#475569', background: '#ffffff', strokeWidth: 0 },
+                    arrows: arrows,
+                    color: { color: '#94a3b8', highlight: '#3b82f6' },
+                    width: 2,
+                    length: 250 // Give relations a bit more distance to read the label clearly
+                });
+            });
+
+            return { nodes, edges };
+        }
+
+        function renderDiagram() {
+            const schema = schemaInput.value;
+            const placeholder = document.getElementById('placeholder');
+            
+            if (!schema.trim()) {
+                if(placeholder) placeholder.innerHTML = '<p class="text-gray-400">Schema is empty.</p>';
+                return;
+            }
+
+            try {
+                if(placeholder) placeholder.style.display = 'none';
+
+                const graphData = parsePrismaToGraph(schema);
+                
+                const data = {
+                    nodes: new vis.DataSet(graphData.nodes),
+                    edges: new vis.DataSet(graphData.edges)
+                };
+
+                const options = {
+                    layout: {
+                        randomSeed: 42, // Keeps layout consistent across clicks
+                        improvedLayout: true
+                    },
+                    physics: {
+                        enabled: true,
+                        solver: 'barnesHut',
+                        barnesHut: {
+                            gravitationalConstant: -2000,
+                            centralGravity: 0.3,
+                            springLength: 250,
+                            springConstant: 0.04,
+                            damping: 0.09,
+                            avoidOverlap: 1
+                        },
+                        stabilization: {
+                            enabled: true,
+                            iterations: 500, // Forces algorithm to stop after 500 iterations
+                            updateInterval: 100,
+                            fit: true
+                        }
+                    },
+                    interaction: {
+                        dragNodes: true,
+                        dragView: true,
+                        zoomView: true
+                    }
+                };
+
+                if (network !== null) {
+                    network.destroy();
+                    network = null;
+                }
+
+                network = new vis.Network(diagramContainer, data, options);
+
+                // Disable physics strictly after the defined stabilization iterations
+                network.once("stabilizationIterationsDone", function () {
+                    network.setOptions({ physics: { enabled: false } });
+                });
+
+            } catch (error) {
+                console.error(error);
+                if(placeholder) {
+                    placeholder.style.display = 'flex';
+                    placeholder.innerHTML = `<div class="text-red-500 bg-red-50 p-4 rounded-md border border-red-200"><p>${error.message}</p></div>`;
+                }
+            }
+        }
+
+        renderBtn.addEventListener('click', renderDiagram);
+        window.addEventListener('DOMContentLoaded', renderDiagram);
+    </script>
+</body>
+</html>
