@@ -3,256 +3,427 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prisma Schema Visualizer</title>
-    <!-- Use Tailwind v4 via CDN as requested -->
+    <title>Prisma Schema Visualizer Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Use Vis-Network for interactive/draggable diagrams instead of Mermaid -->
-    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/standalone/umd/vis-network.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #161b27;
+            --surface2: #1e2535;
+            --border: #2a3347;
+            --border-bright: #3d4f6e;
+            --text: #e2e8f0;
+            --text-muted: #64748b;
+            --accent: #7c6af7;
+            --accent2: #38bdf8;
+            --accent3: #34d399;
+            --highlight-bg: rgba(124, 106, 247, 0.15);
+        }
+        * { box-sizing: border-box; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Outfit', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            margin: 0;
+        }
+        #app { display: flex; height: 100vh; width: 100%; gap: 12px; padding: 14px; }
+        #leftPanel {
+            width: 40%;
+            min-width: 350px;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s cubic-bezier(.4,0,.2,1);
+        }
+        #leftPanel.collapsed {
+            width: 0 !important;
+            min-width: 0 !important;
+            opacity: 0;
+            pointer-events: none;
+        }
+        #editorWrapper {
+            position: relative;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            background: var(--surface);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+        #schemaInput {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.7;
+            background: transparent;
+            color: var(--text);
+            caret-color: var(--accent);
+            resize: none;
+            outline: none;
+            width: 100%;
+            flex: 1;
+            padding: 16px 16px 16px 52px;
+            border: none;
+            z-index: 10;
+        }
+        .editor-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.7;
+            padding: 16px 16px 16px 52px;
+            white-space: pre;
+            color: transparent;
+            z-index: 5;
+        }
+        .hl {
+            background: var(--highlight-bg);
+            border-left: 3px solid var(--accent);
+            display: block;
+            margin-left: -52px;
+            padding-left: 49px;
+        }
+        #lineNumbers {
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 40px;
+            padding: 16px 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            line-height: 1.85;
+            color: var(--text-muted);
+            text-align: right;
+            border-right: 1px solid var(--border);
+            background: rgba(0,0,0,0.2);
+            pointer-events: none;
+        }
+        #rightPanel { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        #diagramContainer {
+            flex: 1;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            position: relative;
+        }
+        .btn {
+            border: none; cursor: pointer;
+            font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 13px;
+            border-radius: 8px; padding: 8px 16px;
+            transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px;
+        }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .btn-ghost { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+        #restoreBtn {
+            position: fixed; left: 0; top: 50%; transform: translateY(-50%);
+            z-index: 50; background: var(--accent); color: white;
+            width: 24px; height: 50px; border-radius: 0 8px 8px 0;
+            display: none; align-items: center; justify-content: center;
+        }
+        .vis-tooltip {
+            background: var(--surface2) !important; color: white !important;
+            border: 1px solid var(--border-bright) !important; padding: 8px !important;
+            font-family: 'JetBrains Mono', monospace !important; border-radius: 6px !important;
+        }
+    </style>
 </head>
-<body class="bg-gray-50 h-screen w-full font-sans overflow-hidden text-gray-900">
+<body>
 
-    <div class="flex h-full w-full">
-        <!-- Left Panel: Code Editor -->
-        <div class="w-1/3 flex flex-col p-4 border-r border-gray-200 bg-white shadow-sm z-10">
-            <div class="flex items-center justify-between mb-3">
-                <h2 class="text-lg font-bold text-gray-800">schema.prisma</h2>
-                <button id="renderBtn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium cursor-pointer shadow-sm">
-                    Visualize
-                </button>
+<div id="restoreBtn">›</div>
+
+<div id="app">
+    <div id="leftPanel">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-xs font-bold uppercase tracking-widest text-slate-500">Prisma Editor</h2>
+            <div class="flex gap-2">
+                <button class="btn btn-ghost p-2" id="collapseBtn">‹</button>
+                <button class="btn btn-primary" id="renderBtn">Visualize</button>
             </div>
-            <textarea 
-                id="schemaInput" 
-                class="flex-1 p-3 border border-gray-300 rounded-md font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 whitespace-pre"
-                spellcheck="false"
-                placeholder="Paste your Prisma schema here..."
-            >
-model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String?
+        </div>
+        <div id="editorWrapper">
+            <div id="lineNumbers"></div>
+            <div class="editor-overlay" id="highlightOverlay"></div>
+            <textarea id="schemaInput" spellcheck="false">model User {
+  id    Int    @id @default(autoincrement())
   posts Post[]
 }
 
 model Post {
-  id        Int     @id @default(autoincrement())
-  title     String
-  content   String?
-  published Boolean @default(false)
-  author    User    @relation(fields: [authorId], references: [id])
-  authorId  Int
-}
-
-model Category {
-  id    Int    @id @default(autoincrement())
-  name  String
-  posts Post[]
-}
-            </textarea>
+  id       Int    @id @default(autoincrement())
+  author   User   @relation(fields: [authorId], references: [id])
+  authorId Int
+  title    String
+}</textarea>
         </div>
-
-        <!-- Right Panel: Diagram Preview -->
-        <div class="w-2/3 p-4 flex flex-col bg-gray-50">
-            <h2 class="text-lg font-bold mb-3 text-gray-800">Diagram Preview (Draggable)</h2>
-            <div 
-                id="diagramContainer" 
-                class="flex-1 bg-white border border-gray-200 rounded-md shadow-inner overflow-hidden relative"
-            >
-                <div id="placeholder" class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <p class="text-gray-400">Click "Visualize" to render diagram.</p>
-                </div>
-            </div>
+        <div id="status" class="mt-3 text-[11px] font-mono text-slate-500 flex items-center gap-2">
+            <div id="statusDot" class="w-2 h-2 rounded-full bg-slate-600"></div>
+            <span id="statusText">Ready</span>
         </div>
     </div>
 
-    <script>
-        const schemaInput = document.getElementById('schemaInput');
-        const diagramContainer = document.getElementById('diagramContainer');
-        const renderBtn = document.getElementById('renderBtn');
-        let network = null;
+    <div id="rightPanel">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-xs font-bold uppercase tracking-widest text-slate-500">Entity Diagram</h2>
+            <div class="flex gap-4 items-center">
+                <span id="stats" class="text-[10px] font-bold text-sky-400 bg-sky-400/10 px-2 py-1 rounded-full border border-sky-400/20">0 Models</span>
+                <button class="btn btn-ghost" id="downloadBtn">Export PNG</button>
+            </div>
+        </div>
+        <div id="diagramContainer">
+            <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center opacity-30">
+                <p>Press visualize to see the schema</p>
+            </div>
+        </div>
+    </div>
+</div>
 
-        /**
-         * Parses Prisma schema string into Vis-Network format and calculates proper cardinalities
-         */
-        function parsePrismaToGraph(schema) {
-            let cleanSchema = schema.replace(/\/\/.*$/gm, '');
-            const models = {};
-            const nodes = [];
-            const edges = [];
-            const relationsMap = {};
+<script>
+/**
+ * Main Visualizer Logic
+ * Fixed: Draggable nodes remain fixed, straight lines for relations.
+ */
+const elements = {
+    input: document.getElementById('schemaInput'),
+    container: document.getElementById('diagramContainer'),
+    renderBtn: document.getElementById('renderBtn'),
+    overlay: document.getElementById('highlightOverlay'),
+    lines: document.getElementById('lineNumbers'),
+    statusText: document.getElementById('statusText'),
+    statusDot: document.getElementById('statusDot'),
+    stats: document.getElementById('stats'),
+    placeholder: document.getElementById('placeholder'),
+    collapseBtn: document.getElementById('collapseBtn'),
+    restoreBtn: document.getElementById('restoreBtn'),
+    leftPanel: document.getElementById('leftPanel')
+};
 
-            const modelRegex = /model\s+(\w+)\s*\{([^}]+)\}/g;
-            let modelMatch;
+let network = null;
+let modelMap = {};
 
-            // Extract models and fields
-            while ((modelMatch = modelRegex.exec(cleanSchema)) !== null) {
-                const modelName = modelMatch[1];
-                const body = modelMatch[2];
-                models[modelName] = [];
+// --- Relation Logic Fixed ---
+function parseSchema(content) {
+    const lines = content.split('\n');
+    const models = {};
+    const nodes = [];
+    const edges = [];
+    modelMap = {};
 
-                const lines = body.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('@@'));
+    let currentModel = null;
+    let startLine = 0;
 
-                lines.forEach(line => {
-                    const parts = line.split(/\s+/);
-                    if (parts.length >= 2) {
-                        models[modelName].push({ name: parts[0], type: parts[1] });
-                    }
+    lines.forEach((line, i) => {
+        const trimmed = line.trim();
+        const modelMatch = trimmed.match(/^model\s+(\w+)\s*\{/);
+        
+        if (modelMatch) {
+            currentModel = modelMatch[1];
+            startLine = i;
+            models[currentModel] = { fields: [], start: i };
+            return;
+        }
+
+        if (currentModel && trimmed === '}') {
+            models[currentModel].end = i;
+            modelMap[currentModel] = { start: startLine, end: i };
+            currentModel = null;
+            return;
+        }
+
+        if (currentModel && trimmed && !trimmed.startsWith('@@')) {
+            const fieldMatch = trimmed.match(/^(\w+)\s+(\w+)(\[\]|\?)?(\s+.*)?$/);
+            if (fieldMatch) {
+                models[currentModel].fields.push({
+                    name: fieldMatch[1],
+                    type: fieldMatch[2],
+                    modifier: fieldMatch[3] || '',
+                    attributes: fieldMatch[4] || ''
                 });
             }
+        }
+    });
 
-            // Generate Nodes and map Relations
-            for (const [modelName, fields] of Object.entries(models)) {
-                // Format label for node using markdown syntax for bold
-                let label = `*${modelName}*\n`;
-                label += '-'.repeat(modelName.length + 4) + '\n';
-                fields.forEach(f => {
-                    label += `${f.name}: ${f.type}\n`;
-                });
+    for (const [name, data] of Object.entries(models)) {
+        let label = `<b>${name}</b>\n`;
+        label += `<i>${'-'.repeat(name.length + 4)}</i>\n`;
+        data.fields.forEach(f => {
+            const isRel = models[f.type];
+            label += `${isRel ? '◈' : '  '} ${f.name}: ${f.type}${f.modifier}\n`;
+        });
 
-                nodes.push({
-                    id: modelName,
-                    label: label,
-                    shape: 'box',
-                    font: { multi: 'md', align: 'left', face: 'monospace', size: 14 },
-                    color: { background: '#f8fafc', border: '#cbd5e1' },
-                    margin: 10
-                });
+        nodes.push({
+            id: name,
+            label: label,
+            shape: 'box',
+            margin: 15,
+            font: { multi: 'html', face: 'JetBrains Mono', size: 13, color: '#e2e8f0' },
+            color: { background: '#1e2535', border: '#3d4f6e', highlight: '#7c6af7' }
+        });
+    }
 
-                // Find relations to determine cardinality
-                fields.forEach(f => {
-                    const cleanType = f.type.replace(/\[\]|\?/g, '');
-                    if (models[cleanType] && cleanType !== modelName) {
-                        const isArray = f.type.endsWith('[]');
-                        const entities = [modelName, cleanType].sort();
-                        const relationKey = `${entities[0]}-${entities[1]}`;
-                        
-                        // Initialize relation tracking if not exists
-                        if (!relationsMap[relationKey]) {
-                            relationsMap[relationKey] = {
-                                modelA: entities[0],
-                                modelB: entities[1],
-                                aIsArray: false,
-                                bIsArray: false
-                            };
-                        }
+    const trackedRelations = new Set();
 
-                        // Register array status for the specific side of the relation
-                        if (modelName === entities[0]) {
-                            if (isArray) relationsMap[relationKey].aIsArray = true;
-                        } else {
-                            if (isArray) relationsMap[relationKey].bIsArray = true;
-                        }
-                    }
-                });
-            }
+    for (const [sourceModel, data] of Object.entries(models)) {
+        data.fields.forEach(field => {
+            if (models[field.type]) {
+                const targetModel = field.type;
+                const pairKey = [sourceModel, targetModel].sort().join('-');
+                
+                if (trackedRelations.has(pairKey)) return;
+                trackedRelations.add(pairKey);
 
-            // Generate Edges based on mapped Cardinalities
-            Object.values(relationsMap).forEach(rel => {
-                let label = '';
-                let arrows = '';
+                const sourceField = field;
+                const targetField = models[targetModel].fields.find(f => f.type === sourceModel);
 
-                if (rel.aIsArray && rel.bIsArray) {
-                    label = 'N : M';
-                    arrows = 'to, from';
-                } else if (rel.aIsArray && !rel.bIsArray) {
-                    // modelA has Many modelB, so modelA is '1' and modelB is 'N'
-                    label = '1 : N';
-                    arrows = 'to'; // Arrow points to the 'Many' side (modelB)
-                } else if (!rel.aIsArray && rel.bIsArray) {
-                    // modelB has Many modelA, so modelA is 'N' and modelB is '1'
-                    label = 'N : 1';
-                    arrows = 'from'; // Arrow points to the 'Many' side (modelA)
-                } else {
-                    label = '1 : 1';
-                    arrows = ''; // No arrows for 1:1, or you can configure 'to, from'
+                let cardinality = "1 : 1";
+                let arrows = "";
+
+                if (sourceField.modifier === '[]' && (!targetField || targetField.modifier !== '[]')) {
+                    cardinality = "1 : N";
+                    arrows = { to: { enabled: true } };
+                } else if (sourceField.modifier !== '[]' && (targetField && targetField.modifier === '[]')) {
+                    cardinality = "1 : N";
+                    arrows = { from: { enabled: true } };
+                } else if (sourceField.modifier === '[]' && (targetField && targetField.modifier === '[]')) {
+                    cardinality = "N : M";
+                    arrows = { to: { enabled: true }, from: { enabled: true } };
                 }
 
                 edges.push({
-                    from: rel.modelA,
-                    to: rel.modelB,
-                    label: label,
-                    font: { align: 'horizontal', size: 14, color: '#475569', background: '#ffffff', strokeWidth: 0 },
+                    from: sourceModel,
+                    to: targetModel,
+                    label: cardinality,
                     arrows: arrows,
-                    color: { color: '#94a3b8', highlight: '#3b82f6' },
-                    width: 2,
-                    length: 250 // Give relations a bit more distance to read the label clearly
+                    // Straight lines as requested
+                    smooth: false,
+                    font: { size: 11, color: '#64748b', background: '#161b27' },
+                    color: { color: '#3d4f6e', highlight: '#7c6af7' },
+                    length: 250
                 });
-            });
-
-            return { nodes, edges };
-        }
-
-        function renderDiagram() {
-            const schema = schemaInput.value;
-            const placeholder = document.getElementById('placeholder');
-            
-            if (!schema.trim()) {
-                if(placeholder) placeholder.innerHTML = '<p class="text-gray-400">Schema is empty.</p>';
-                return;
             }
+        });
+    }
 
-            try {
-                if(placeholder) placeholder.style.display = 'none';
+    return { nodes, edges };
+}
 
-                const graphData = parsePrismaToGraph(schema);
-                
-                const data = {
-                    nodes: new vis.DataSet(graphData.nodes),
-                    edges: new vis.DataSet(graphData.edges)
-                };
+function render() {
+    try {
+        const { nodes, edges } = parseSchema(elements.input.value);
+        if (!elements.container) return;
+        if (elements.placeholder) elements.placeholder.style.display = 'none';
+        
+        const data = {
+            nodes: new vis.DataSet(nodes),
+            edges: new vis.DataSet(edges)
+        };
 
-                const options = {
-                    layout: {
-                        randomSeed: 42, // Keeps layout consistent across clicks
-                        improvedLayout: true
-                    },
-                    physics: {
-                        enabled: true,
-                        solver: 'barnesHut',
-                        barnesHut: {
-                            gravitationalConstant: -2000,
-                            centralGravity: 0.3,
-                            springLength: 250,
-                            springConstant: 0.04,
-                            damping: 0.09,
-                            avoidOverlap: 1
-                        },
-                        stabilization: {
-                            enabled: true,
-                            iterations: 500, // Forces algorithm to stop after 500 iterations
-                            updateInterval: 100,
-                            fit: true
-                        }
-                    },
-                    interaction: {
-                        dragNodes: true,
-                        dragView: true,
-                        zoomView: true
-                    }
-                };
-
-                if (network !== null) {
-                    network.destroy();
-                    network = null;
+        const options = {
+            physics: {
+                enabled: true,
+                barnesHut: { 
+                    gravitationalConstant: -2000, 
+                    springLength: 200,
+                    springConstant: 0.04,
+                    damping: 0.09
+                },
+                stabilization: { 
+                    iterations: 200,
+                    updateInterval: 25
                 }
-
-                network = new vis.Network(diagramContainer, data, options);
-
-                // Disable physics strictly after the defined stabilization iterations
-                network.once("stabilizationIterationsDone", function () {
-                    network.setOptions({ physics: { enabled: false } });
-                });
-
-            } catch (error) {
-                console.error(error);
-                if(placeholder) {
-                    placeholder.style.display = 'flex';
-                    placeholder.innerHTML = `<div class="text-red-500 bg-red-50 p-4 rounded-md border border-red-200"><p>${error.message}</p></div>`;
-                }
+            },
+            edges: {
+                smooth: false // Default to straight lines
+            },
+            interaction: { 
+                hover: true,
+                dragNodes: true,
+                dragView: true
             }
-        }
+        };
 
-        renderBtn.addEventListener('click', renderDiagram);
-        window.addEventListener('DOMContentLoaded', renderDiagram);
-    </script>
+        if (network) network.destroy();
+        network = new vis.Network(elements.container, data, options);
+
+        // Crucial: Disable physics after stabilization so nodes stay where they are dragged
+        network.on("stabilizationIterationsDone", function () {
+            network.setOptions({ physics: { enabled: false } });
+            elements.statusText.textContent = "Diagram ready (Fixed Positions)";
+        });
+
+        elements.stats.textContent = `${nodes.length} Models`;
+        elements.statusText.textContent = "Stabilizing...";
+        elements.statusDot.className = "w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]";
+
+        network.on("click", (params) => {
+            if (params.nodes.length > 0) {
+                const nodeName = params.nodes[0];
+                highlightLine(modelMap[nodeName]);
+            } else {
+                clearHighlight();
+            }
+        });
+
+    } catch (e) {
+        console.error(e);
+        elements.statusText.textContent = "Parser Error";
+        elements.statusDot.className = "w-2 h-2 rounded-full bg-red-500";
+    }
+}
+
+function highlightLine(range) {
+    if (!range) return;
+    const lines = elements.input.value.split('\n');
+    let html = '';
+    lines.forEach((line, i) => {
+        const content = line || ' ';
+        if (i >= range.start && i <= range.end) {
+            html += `<span class="hl">${content}</span>\n`;
+        } else {
+            html += `<span>${content}</span>\n`;
+        }
+    });
+    elements.overlay.innerHTML = html;
+    
+    const lh = 22.1; 
+    elements.input.scrollTo({ top: range.start * lh, behavior: 'smooth' });
+}
+
+function clearHighlight() {
+    elements.overlay.innerHTML = '';
+}
+
+function updateLines() {
+    const count = elements.input.value.split('\n').length;
+    elements.lines.innerHTML = Array.from({length: count}, (_, i) => `<div>${i+1}</div>`).join('');
+}
+
+elements.renderBtn.onclick = render;
+elements.input.oninput = updateLines;
+elements.input.onscroll = () => {
+    elements.overlay.scrollTop = elements.input.scrollTop;
+    elements.lines.scrollTop = elements.input.scrollTop;
+};
+
+elements.collapseBtn.onclick = () => {
+    elements.leftPanel.classList.add('collapsed');
+    elements.restoreBtn.style.display = 'flex';
+};
+
+elements.restoreBtn.onclick = () => {
+    elements.leftPanel.classList.remove('collapsed');
+    elements.restoreBtn.style.display = 'none';
+};
+
+window.onload = () => {
+    updateLines();
+    render();
+};
+</script>
 </body>
 </html>
