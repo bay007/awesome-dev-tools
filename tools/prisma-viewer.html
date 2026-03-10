@@ -120,6 +120,7 @@
         .btn-primary { background: var(--accent); color: white; }
         .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
         .btn-ghost { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+        .btn-ghost:hover { border-color: var(--border-bright); color: var(--text); }
         #restoreBtn {
             position: fixed; left: 0; top: 50%; transform: translateY(-50%);
             z-index: 50; background: var(--accent); color: white;
@@ -140,10 +141,10 @@
 <div id="app">
     <div id="leftPanel">
         <div class="flex items-center justify-between mb-3">
-            <h2 class="text-xs font-bold uppercase tracking-widest text-slate-500">Prisma Editor</h2>
+            <h2 class="text-xs font-bold uppercase tracking-widest text-slate-500">Editor Prisma</h2>
             <div class="flex gap-2">
                 <button class="btn btn-ghost p-2" id="collapseBtn">‹</button>
-                <button class="btn btn-primary" id="renderBtn">Visualize</button>
+                <button class="btn btn-primary" id="renderBtn">Visualizar</button>
             </div>
         </div>
         <div id="editorWrapper">
@@ -163,21 +164,22 @@ model Post {
         </div>
         <div id="status" class="mt-3 text-[11px] font-mono text-slate-500 flex items-center gap-2">
             <div id="statusDot" class="w-2 h-2 rounded-full bg-slate-600"></div>
-            <span id="statusText">Ready</span>
+            <span id="statusText">Listo</span>
         </div>
     </div>
 
     <div id="rightPanel">
         <div class="flex items-center justify-between mb-3">
-            <h2 class="text-xs font-bold uppercase tracking-widest text-slate-500">Entity Diagram</h2>
-            <div class="flex gap-4 items-center">
-                <span id="stats" class="text-[10px] font-bold text-sky-400 bg-sky-400/10 px-2 py-1 rounded-full border border-sky-400/20">0 Models</span>
-                <button class="btn btn-ghost" id="downloadBtn">Export PNG</button>
+            <h2 class="text-xs font-bold uppercase tracking-widest text-slate-500">Diagrama de Entidades</h2>
+            <div class="flex gap-2 items-center">
+                <span id="stats" class="text-[10px] font-bold text-sky-400 bg-sky-400/10 px-2 py-1 rounded-full border border-sky-400/20 mr-2">0 Modelos</span>
+                <button class="btn btn-ghost text-[11px] px-3 py-1.5" id="downloadSchemaBtn">Descargar .prisma</button>
+                <button class="btn btn-ghost text-[11px] px-3 py-1.5" id="downloadBtn">Exportar PNG</button>
             </div>
         </div>
         <div id="diagramContainer">
             <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center opacity-30">
-                <p>Press visualize to see the schema</p>
+                <p>Presiona visualizar para ver el esquema</p>
             </div>
         </div>
     </div>
@@ -187,6 +189,7 @@ model Post {
 /**
  * Main Visualizer Logic
  * Fixed: Draggable nodes remain fixed, straight lines for relations.
+ * Added: Download functionality for PNG and Schema file.
  */
 const elements = {
     input: document.getElementById('schemaInput'),
@@ -200,13 +203,15 @@ const elements = {
     placeholder: document.getElementById('placeholder'),
     collapseBtn: document.getElementById('collapseBtn'),
     restoreBtn: document.getElementById('restoreBtn'),
-    leftPanel: document.getElementById('leftPanel')
+    leftPanel: document.getElementById('leftPanel'),
+    downloadBtn: document.getElementById('downloadBtn'),
+    downloadSchemaBtn: document.getElementById('downloadSchemaBtn')
 };
 
 let network = null;
 let modelMap = {};
 
-// --- Relation Logic Fixed ---
+// --- Relation Logic ---
 function parseSchema(content) {
     const lines = content.split('\n');
     const models = {};
@@ -299,7 +304,6 @@ function parseSchema(content) {
                     to: targetModel,
                     label: cardinality,
                     arrows: arrows,
-                    // Straight lines as requested
                     smooth: false,
                     font: { size: 11, color: '#64748b', background: '#161b27' },
                     color: { color: '#3d4f6e', highlight: '#7c6af7' },
@@ -338,7 +342,7 @@ function render() {
                 }
             },
             edges: {
-                smooth: false // Default to straight lines
+                smooth: false 
             },
             interaction: { 
                 hover: true,
@@ -350,14 +354,13 @@ function render() {
         if (network) network.destroy();
         network = new vis.Network(elements.container, data, options);
 
-        // Crucial: Disable physics after stabilization so nodes stay where they are dragged
         network.on("stabilizationIterationsDone", function () {
             network.setOptions({ physics: { enabled: false } });
-            elements.statusText.textContent = "Diagram ready (Fixed Positions)";
+            elements.statusText.textContent = "Diagrama listo (Posiciones fijas)";
         });
 
-        elements.stats.textContent = `${nodes.length} Models`;
-        elements.statusText.textContent = "Stabilizing...";
+        elements.stats.textContent = `${nodes.length} Modelos`;
+        elements.statusText.textContent = "Estabilizando...";
         elements.statusDot.className = "w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]";
 
         network.on("click", (params) => {
@@ -371,11 +374,58 @@ function render() {
 
     } catch (e) {
         console.error(e);
-        elements.statusText.textContent = "Parser Error";
+        elements.statusText.textContent = "Error de parseo";
         elements.statusDot.className = "w-2 h-2 rounded-full bg-red-500";
     }
 }
 
+// --- Download Logic ---
+function exportPNG() {
+    if (!network) return;
+    
+    // Get the actual canvas from vis-network
+    const canvas = elements.container.querySelector('canvas');
+    if (!canvas) return;
+
+    // Create a temporary canvas to draw with a background color
+    const offscreen = document.createElement('canvas');
+    offscreen.width = canvas.width;
+    offscreen.height = canvas.height;
+    const ctx = offscreen.getContext('2d');
+
+    // Fill background (match app theme)
+    ctx.fillStyle = '#0f1117';
+    ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+    
+    // Draw the network on top
+    ctx.drawImage(canvas, 0, 0);
+
+    const link = document.createElement('a');
+    link.download = 'prisma-schema-diagram.png';
+    link.href = offscreen.toDataURL('image/png');
+    link.click();
+    
+    elements.statusText.textContent = "PNG exportado correctamente";
+}
+
+function downloadSchema() {
+    const content = elements.input.value;
+    if (!content.trim()) return;
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'schema.prisma';
+    link.click();
+    
+    // Clean up
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+    elements.statusText.textContent = "Archivo .prisma descargado";
+}
+
+// --- UI Helpers ---
 function highlightLine(range) {
     if (!range) return;
     const lines = elements.input.value.split('\n');
@@ -403,7 +453,10 @@ function updateLines() {
     elements.lines.innerHTML = Array.from({length: count}, (_, i) => `<div>${i+1}</div>`).join('');
 }
 
+// --- Events ---
 elements.renderBtn.onclick = render;
+elements.downloadBtn.onclick = exportPNG;
+elements.downloadSchemaBtn.onclick = downloadSchema;
 elements.input.oninput = updateLines;
 elements.input.onscroll = () => {
     elements.overlay.scrollTop = elements.input.scrollTop;
