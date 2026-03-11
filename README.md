@@ -8,6 +8,8 @@ Este repositorio contiene una colección de herramientas web ligeras construidas
 - **TimeStream Visualizer** – inspecciona flujos temporales.
 - **HTML Viewer** – renderiza HTML introducido por el usuario.
 - **HAR Analyzer** – inspecciona archivos HAR con vista de waterfall y análisis de JSON.
+- **JSON Minifier** – comprime y optimiza archivos JSON.
+- **Data Analyzer** – potente análisis estadístico con precisión decimal.
 
 ## Contribuir
 1. **Fork** este repositorio.

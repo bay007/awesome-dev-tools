@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estadística Pro - Vanilla JS</title>
+    <!-- Tailwind CSS v3/v4 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Decimal.js for high precision math -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/decimal.js/10.4.3/decimal.min.js"></script>
+    <!-- Chart.js for visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- html-to-image -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #fcfcfd; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+    </style>
+</head>
+<body class="antialiased text-slate-900">
+
+    <div class="min-h-screen p-4 md:p-12">
+        <div class="max-w-7xl mx-auto space-y-10">
+            <!-- Header -->
+            <header class="flex flex-col md:flex-row md:items-end justify-between border-b border-slate-200 pb-8">
+                <div>
+                    <h1 class="text-5xl font-black tracking-tighter">
+                        Estadística <span class="text-blue-600 italic">Pro</span>
+                    </h1>
+                    <p class="text-slate-500 font-medium text-lg mt-2">Vanilla JS + Decimal.js Precision Engine</p>
+                </div>
+                <div class="mt-4 md:mt-0 flex items-center gap-2 text-[10px] font-bold bg-blue-50 text-blue-600 px-4 py-2 rounded-full border border-blue-100 uppercase tracking-widest">
+                    <span class="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span>
+                    Cálculo de Punto Fijo Activado
+                </div>
+            </header>
+
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+                <!-- Sidebar: Inputs -->
+                <aside class="xl:col-span-3 space-y-6">
+                    <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm ring-1 ring-slate-950/5">
+                        <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3">Datos de Origen</label>
+                        <textarea id="dataInput" class="w-full h-80 p-4 text-sm font-mono border border-slate-100 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-slate-50 transition-all custom-scrollbar" placeholder="Pega tus números aquí...">9
+10
+10
+10
+10
+7
+10
+9
+9
+10</textarea>
+                        
+                        <div class="mt-6">
+                            <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3 text-center">Tipo de Análisis</label>
+                            <div class="grid grid-cols-2 gap-2" id="chartTypeSelector">
+                                <button data-type="bar" class="chart-btn p-3 rounded-xl border bg-blue-600 border-blue-600 text-white shadow-lg flex items-center justify-center transition-all">
+                                    <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
+                                </button>
+                                <button data-type="line" class="chart-btn p-3 rounded-xl border bg-white border-slate-200 text-slate-400 hover:bg-slate-50 flex items-center justify-center transition-all">
+                                    <i data-lucide="line-chart" class="w-5 h-5"></i>
+                                </button>
+                                <button data-type="radar" class="chart-btn p-3 rounded-xl border bg-white border-slate-200 text-slate-400 hover:bg-slate-50 flex items-center justify-center transition-all">
+                                    <i data-lucide="target" class="w-5 h-5"></i>
+                                </button>
+                                <button id="downloadBtn" class="p-3 rounded-xl border bg-slate-900 border-slate-900 text-white hover:bg-slate-800 flex items-center justify-center transition-all">
+                                    <i data-lucide="download" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- Main Content -->
+                <main class="xl:col-span-9 space-y-8">
+                    <!-- Stats Grid -->
+                    <div id="statsGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                        <!-- Stat badges will be injected here -->
+                    </div>
+
+                    <!-- Chart Card -->
+                    <div id="chartCard" class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="flex items-center gap-3 mb-8">
+                            <div class="w-2 h-8 bg-blue-600 rounded-full"></div>
+                            <h3 class="text-xl font-black text-slate-800">Distribución de Frecuencias</h3>
+                        </div>
+                        <div class="relative h-[450px] w-full">
+                            <canvas id="mainChart"></canvas>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Initialization ---
+        let currentChart = null;
+        let selectedChartType = 'bar';
+
+        /**
+         * Create stat badge HTML
+         */
+        function createStatBadge(label, value, tooltip, highlight = false) {
+            return `
+                <div class="group relative p-4 rounded-2xl border transition-all hover:shadow-xl hover:-translate-y-1 cursor-help ${highlight ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white border-slate-200 text-slate-800'}">
+                    <span class="text-[10px] font-bold uppercase tracking-widest mb-1 block ${highlight ? 'text-blue-100' : 'text-slate-400'}">
+                        ${label}
+                    </span>
+                    <span class="text-lg font-black tabular-nums">${value}</span>
+                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 hidden group-hover:block w-72 p-4 bg-slate-900 text-white text-xs rounded-2xl shadow-2xl z-50 pointer-events-none leading-relaxed border border-slate-700">
+                        <div class="font-bold mb-2 text-blue-400 border-b border-slate-700 pb-1 flex items-center gap-1 uppercase tracking-tighter">
+                            Interpretación
+                        </div>
+                        ${tooltip}
+                        <div class="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        /**
+         * Calculate stats using Decimal.js
+         */
+        function processData() {
+            const text = document.getElementById('dataInput').value;
+            const matches = text.match(/-?\d+(?:\.\d+)?/g);
+            if (!matches) {
+                document.getElementById('statsGrid').innerHTML = '';
+                if(currentChart) currentChart.destroy();
+                return;
+            }
+
+            const numbers = matches.map(n => parseFloat(n));
+            const sorted = [...numbers].sort((a, b) => a - b);
+            const n = new Decimal(sorted.length);
+
+            // Basic aggregates
+            const sum = sorted.reduce((acc, val) => acc.plus(new Decimal(val)), new Decimal(0));
+            const mean = sum.dividedBy(n);
+            
+            // Median
+            const mid = Math.floor(sorted.length / 2);
+            const median = sorted.length % 2 !== 0 
+                ? new Decimal(sorted[mid]) 
+                : new Decimal(sorted[mid-1]).plus(sorted[mid]).dividedBy(2);
+
+            // Variance/StdDev (Sample n-1)
+            const variance = n.gt(1) 
+                ? sorted.reduce((acc, v) => acc.plus(new Decimal(v).minus(mean).pow(2)), new Decimal(0)).dividedBy(n.minus(1))
+                : new Decimal(0);
+            const stdDev = variance.sqrt();
+
+            const min = sorted[0];
+            const max = sorted[sorted.length - 1];
+            
+            // Frequencies
+            const freqMap = new Map();
+            sorted.forEach(v => freqMap.set(v, (freqMap.get(v) || 0) + 1));
+            const labels = Array.from(freqMap.keys()).sort((a,b) => a-b);
+            const dataValues = labels.map(l => freqMap.get(l));
+
+            // Skewness (Excel SKEW)
+            let skew = new Decimal(0);
+            if (n.gt(2) && !stdDev.isZero()) {
+                const factor = n.dividedBy(n.minus(1).times(n.minus(2)));
+                const sumCubes = sorted.reduce((acc, v) => acc.plus(new Decimal(v).minus(mean).dividedBy(stdDev).pow(3)), new Decimal(0));
+                skew = factor.times(sumCubes);
+            }
+
+            // Kurtosis (Excel KURT)
+            let kurt = new Decimal(0);
+            if (n.gt(3) && !stdDev.isZero()) {
+                const term1 = n.times(n.plus(1)).dividedBy(n.minus(1).times(n.minus(2)).times(n.minus(3)));
+                const sumQuads = sorted.reduce((acc, v) => acc.plus(new Decimal(v).minus(mean).dividedBy(stdDev).pow(4)), new Decimal(0));
+                const term2 = new Decimal(3).times(n.minus(1).pow(2)).dividedBy(n.minus(2).times(n.minus(3)));
+                kurt = term1.times(sumQuads).minus(term2);
+            }
+
+            // Update UI
+            const grid = document.getElementById('statsGrid');
+            grid.innerHTML = `
+                ${createStatBadge('Media', mean.toFixed(5), 'Promedio exacto de los datos.', true)}
+                ${createStatBadge('Conteo (N)', sorted.length, 'Total de números detectados.')}
+                ${createStatBadge('Suma Total', sum.toFixed(2), 'Suma absoluta de los valores.')}
+                ${createStatBadge('Desviación Est.', stdDev.toFixed(5), 'Dispersión de los datos.')}
+                ${createStatBadge('Mediana', median.toFixed(2), 'El valor central.')}
+                ${createStatBadge('Mínimo', min, 'El valor más bajo.')}
+                ${createStatBadge('Máximo', max, 'El valor más alto.')}
+                ${createStatBadge('Asimetría', skew.toFixed(4), 'Sesgo de la distribución.')}
+                ${createStatBadge('Curtosis', kurt.toFixed(4), 'Concentración de valores extremos.')}
+            `;
+
+            updateChart(labels, dataValues);
+        }
+
+        /**
+         * Update Chart.js instance
+         */
+        function updateChart(labels, data) {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            
+            if (currentChart) {
+                currentChart.destroy();
+            }
+
+            const config = {
+                type: selectedChartType,
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Frecuencia',
+                        data: data,
+                        backgroundColor: selectedChartType === 'radar' ? 'rgba(37, 99, 235, 0.2)' : '#2563eb',
+                        borderColor: '#2563eb',
+                        borderWidth: 2,
+                        borderRadius: selectedChartType === 'bar' ? 8 : 0,
+                        tension: 0.4,
+                        fill: selectedChartType === 'radar' || selectedChartType === 'line'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0f172a',
+                            padding: 12,
+                            borderRadius: 12
+                        }
+                    },
+                    scales: selectedChartType !== 'radar' ? {
+                        y: { 
+                            beginAtZero: true,
+                            grid: { color: '#f1f5f9' },
+                            ticks: { font: { family: 'Inter' } }
+                        },
+                        x: { 
+                            grid: { display: false },
+                            ticks: { font: { family: 'Inter' } }
+                        }
+                    } : {}
+                }
+            };
+
+            currentChart = new Chart(ctx, config);
+        }
+
+        // --- Event Listeners ---
+
+        document.getElementById('dataInput').addEventListener('input', processData);
+
+        document.querySelectorAll('.chart-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.chart-btn').forEach(b => {
+                    b.classList.remove('bg-blue-600', 'text-white', 'shadow-lg', 'border-blue-600');
+                    b.classList.add('bg-white', 'text-slate-400', 'border-slate-200');
+                });
+                const target = e.currentTarget;
+                target.classList.remove('bg-white', 'text-slate-400', 'border-slate-200');
+                target.classList.add('bg-blue-600', 'text-white', 'shadow-lg', 'border-blue-600');
+                
+                selectedChartType = target.dataset.type;
+                processData();
+            });
+        });
+
+        document.getElementById('downloadBtn').addEventListener('click', async () => {
+            const card = document.getElementById('chartCard');
+            const originalShadow = card.style.boxShadow;
+            card.style.boxShadow = 'none'; // Clean capture
+
+            try {
+                const dataUrl = await htmlToImage.toPng(card, { backgroundColor: '#ffffff' });
+                const link = document.createElement('a');
+                link.download = `estadistica-pro-${Date.now()}.png`;
+                link.href = dataUrl;
+                link.click();
+            } catch (err) {
+                console.error('Download error:', err);
+            } finally {
+                card.style.boxShadow = originalShadow;
+            }
+        });
+
+        // Bootstrap
+        window.onload = () => {
+            lucide.createIcons();
+            processData();
+        };
+    </script>
+</body>
+</html>
