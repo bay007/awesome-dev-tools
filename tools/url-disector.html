@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-900 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>URL Disector Pro</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* Custom scrollbar styling for a premium dark look */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans overflow-hidden select-none">
+
+  <!-- TOP HEADER -->
+  <header class="border-b border-slate-800 bg-slate-950 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-md shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="bg-blue-600 p-2 rounded-xl text-white">
+        <i data-lucide="code" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+          URL Disector Pro
+          <span class="text-xs bg-slate-800 text-emerald-400 px-2.5 py-0.5 rounded-full font-mono border border-slate-700">
+            HTML &amp; JS v3.5
+          </span>
+        </h1>
+        <p class="text-xs text-slate-400">Analizador comparativo rápido • Vanilla JS &amp; Tailwind</p>
+      </div>
+    </div>
+
+    <!-- Global Toolbar Controls -->
+    <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+      <!-- Layout Selector: Detail vs Side-by-Side -->
+      <div class="bg-slate-900 border border-slate-850 rounded-xl p-1 flex shadow-inner">
+        <button
+          id="btn-layout-detail"
+          onclick="setViewLayout('detail')"
+          class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-white bg-blue-600"
+          title="Vista de análisis individual"
+        >
+          <i data-lucide="layout-list" class="w-3.5 h-3.5"></i>
+          Vista Detalle
+        </button>
+        <button
+          id="btn-layout-compare"
+          onclick="setViewLayout('compare')"
+          class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-450 hover:text-white"
+          title="Comparar múltiples URLs lado a lado"
+        >
+          <i data-lucide="columns" class="w-3.5 h-3.5"></i>
+          Lado a Lado <span id="compare-badge-count" class="bg-slate-800 text-slate-300 text-[10px] px-1.5 py-0.2 rounded ml-1">0</span>
+        </button>
+      </div>
+
+      <!-- Hex / Percent Encoded Selector -->
+      <div class="bg-slate-900 border border-slate-850 rounded-xl p-1 flex shadow-inner">
+        <button
+          id="btn-mode-normal"
+          onclick="setDisplayMode('normal')"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all bg-slate-800 text-blue-400 border border-slate-700"
+        >
+          Normal
+        </button>
+        <button
+          id="btn-mode-urlEncoded"
+          onclick="setDisplayMode('urlEncoded')"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all text-slate-500 hover:text-slate-300"
+        >
+          Encoded
+        </button>
+        <button
+          id="btn-mode-hex"
+          onclick="setDisplayMode('hex')"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all text-slate-500 hover:text-slate-300"
+        >
+          HEX
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- WORKSPACE -->
+  <div class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+    
+    <!-- LEFT PANEL: Inputs & URL History -->
+    <aside id="left-panel-aside" class="w-full lg:w-96 border-r border-slate-800 bg-slate-950/65 flex flex-col shrink-0 overflow-y-auto transition-all duration-300 ease-in-out">
+      
+      <!-- Input Mode Form -->
+      <div class="p-4 border-b border-slate-800 bg-slate-950/30">
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-350 flex items-center gap-1.5">
+            <i data-lucide="plus" class="w-4 h-4 text-blue-500"></i>
+            Agregar URLs
+          </h2>
+          <div class="flex bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+            <button
+              type="button"
+              onclick="setInsertMode('single')"
+              id="btn-insert-single"
+              class="px-2 py-1 rounded text-[10px] font-semibold transition-all bg-slate-800 text-blue-400"
+            >
+              Individual
+            </button>
+            <button
+              type="button"
+              onclick="setInsertMode('bulk')"
+              id="btn-insert-bulk"
+              class="px-2 py-1 rounded text-[10px] font-semibold transition-all text-slate-500 hover:text-slate-300"
+            >
+              Masivo
+            </button>
+          </div>
+        </div>
+
+        <!-- Inputs container -->
+        <div class="space-y-3">
+          <!-- Single Mode Fields -->
+          <div id="container-single-inputs" class="space-y-3">
+            <div>
+              <label class="block text-[10px] font-semibold text-slate-450 uppercase mb-1">Título de la URL</label>
+              <input
+                type="text"
+                id="input-title"
+                placeholder="Ej: Entorno local, API pagos..."
+                class="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label class="block text-[10px] font-semibold text-slate-450 uppercase mb-1">Dirección URL</label>
+              <textarea
+                id="input-url"
+                placeholder="https://ejemplo.com/path?key=value..."
+                class="w-full h-16 bg-slate-900 border border-slate-700/80 rounded-lg p-2 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+              ></textarea>
+            </div>
+          </div>
+
+          <!-- Bulk Mode Fields (Hidden by default) -->
+          <div id="container-bulk-inputs" class="space-y-3 hidden">
+            <div>
+              <label class="block text-[10px] font-semibold text-slate-450 uppercase mb-1">Lista de URLs (Una por línea)</label>
+              <textarea
+                id="input-bulk"
+                placeholder="https://api.com?prod=true&#10;https://api.com?stage=true"
+                class="w-full h-28 bg-slate-900 border border-slate-700/80 rounded-lg p-2 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+              ></textarea>
+            </div>
+          </div>
+
+          <!-- Alert element inside form -->
+          <div id="form-error-alert" class="hidden text-red-400 text-[11px] bg-red-950/20 border border-red-900/40 rounded p-2 flex items-center gap-1">
+            <i data-lucide="info" class="w-3.5 h-3.5 shrink-0"></i>
+            <span id="form-error-text">Este campo es requerido.</span>
+          </div>
+
+          <!-- Form Buttons -->
+          <div class="flex gap-2 pt-1">
+            <button
+              onclick="handleFormSubmit()"
+              class="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              Diseccionar
+            </button>
+            <button
+              onclick="clearAllHistory()"
+              class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold py-2 px-3 rounded-lg transition-colors cursor-pointer"
+              title="Limpiar toda la lista"
+            >
+              Limpiar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- URL History List -->
+      <div class="flex-1 p-4 flex flex-col overflow-hidden">
+        <div class="flex justify-between items-center mb-3 shrink-0">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Historial de URLs (<span id="history-total-count">0</span>)
+          </span>
+          <span id="layout-helper-text" class="text-[10px] text-blue-400 font-semibold">
+            Haz click para seleccionar
+          </span>
+        </div>
+
+        <!-- List container -->
+        <div id="history-list-container" class="flex-1 overflow-y-auto space-y-2 pr-1">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+    </aside>
+
+    <!-- -->
+    <!-- COLLAPSE TOGGLE BUTTON FOR LEFT PANEL -->
+    <button 
+      id="btn-collapse-left"
+      onclick="toggleLeftPanel()"
+      class="absolute left-0 lg:left-96 top-1/2 -translate-y-1/2 z-30 bg-slate-850 border border-slate-750 hover:bg-slate-800 text-slate-300 p-1.5 rounded-r-md shadow-lg flex items-center justify-center transition-all duration-300 focus:outline-none"
+      title="Colapsar panel lateral"
+    >
+      <i data-lucide="chevron-left" id="collapse-icon" class="w-4 h-4"></i>
+    </button>
+
+    <!-- RIGHT PANEL: ANALYSIS / COMPARISON WORKSPACE -->
+    <main 
+      id="right-panel-main" 
+      class="flex-1 bg-slate-900 flex flex-col overflow-hidden transition-all duration-300 ease-in-out relative border-l border-slate-800/80"
+    >
+      <!-- Real-time notifications toast inside workspace -->
+      <div id="custom-toast" class="absolute top-4 right-4 z-40 bg-emerald-950 border border-emerald-800 text-emerald-400 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-2xl flex items-center gap-2 transform translate-y-[-100px] opacity-0 transition-all duration-300 pointer-events-none">
+        <i data-lucide="check" class="w-4 h-4"></i>
+        <span id="toast-message">Copiado al portapapeles</span>
+      </div>
+
+      <div id="main-content-area" class="flex-1 flex flex-col overflow-hidden">
+        <!-- Rendered dynamically depending on selectedViewLayout (detail vs compare) -->
+      </div>
+    </main>
+  </div>
+
+  <!-- FOOTER STATUS BAR -->
+  <footer class="bg-slate-950 border-t border-slate-800 px-6 py-3 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2 shrink-0">
+    <div class="flex items-center gap-1.5">
+      <i data-lucide="info" class="w-4 h-4 text-slate-400"></i>
+      <span>Sugerencia: Haz clic en el lápiz (<i data-lucide="edit-2" class="w-3 h-3 inline"></i>) en el historial para editar el título directamente.</span>
+    </div>
+    <div class="flex gap-4">
+      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>Host Primero</span>
+      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span>Orden Alfabético</span>
+    </div>
+  </footer>
+
+  <!-- CORE LOGIC: VANILLA JAVASCRIPT -->
+  <script>
+    // --- State Variables ---
+    let urlList = [
+      {
+        id: "1",
+        title: "Entorno Desarrollo (API Profile)",
+        original: "https://api.example.com/v1/users/profile?auth_token=9a8b7c&category=admin&sort_by=desc&locale=es_MX#dashboard",
+        isValid: true,
+        protocol: "https:",
+        host: "api.example.com",
+        pathname: "/v1/users/profile",
+        hash: "#dashboard",
+        params: [
+          { key: "auth_token", value: "9a8b7c" },
+          { key: "category", value: "admin" },
+          { key: "locale", value: "es_MX" },
+          { key: "sort_by", value: "desc" }
+        ]
+      },
+      {
+        id: "2",
+        title: "Entorno Producción (API Profile)",
+        original: "https://api.example.com/v1/users/profile?auth_token=xyz555&category=user&sort_by=asc&locale=en_US#settings",
+        isValid: true,
+        protocol: "https:",
+        host: "api.example.com",
+        pathname: "/v1/users/profile",
+        hash: "#settings",
+        params: [
+          { key: "auth_token", value: "xyz555" },
+          { key: "category", value: "user" },
+          { key: "locale", value: "en_US" },
+          { key: "sort_by", value: "asc" }
+        ]
+      }
+    ];
+
+    let selectedUrlId = "1";
+    let compareIds = ["1", "2"];
+    let viewLayout = "compare"; // Default: Side-by-Side compare
+    let displayMode = "normal"; // normal, urlEncoded, hex
+    let insertMode = "single"; // single, bulk
+    let leftPanelCollapsed = false;
+
+    // --- Helper Functions ---
+
+    /**
+     * Converts a string to its hexadecimal representation (space-separated bytes)
+     */
+    function toHexBytes(str) {
+      try {
+        const encoder = new TextEncoder();
+        const view = encoder.encode(str);
+        return Array.from(view)
+          .map(b => b.toString(16).padStart(2, "0").toUpperCase())
+          .join(" ");
+      } catch (e) {
+        return "[Error Hex]";
+      }
+    }
+
+    /**
+     * Safely parses and dissects a URL with an assigned title
+     */
+    function dissectSingleUrl(urlString, customTitle) {
+      const trimmed = urlString.trim();
+      const id = crypto.randomUUID();
+      const defaultTitle = customTitle || "URL Sin Título";
+
+      if (!trimmed) {
+        return {
+          id,
+          title: defaultTitle,
+          original: trimmed,
+          isValid: false,
+          protocol: "",
+          host: "",
+          pathname: "",
+          hash: "",
+          params: [],
+          error: "La URL está vacía."
+        };
+      }
+
+      try {
+        let normalizedUrl = trimmed;
+        // Prefix with https if it doesn't look like it has a protocol
+        if (!/^https?:\/\//i.test(trimmed)) {
+          normalizedUrl = "https://" + trimmed;
+        }
+
+        const parsed = new URL(normalizedUrl);
+        const searchParams = new URLSearchParams(parsed.search);
+        
+        // Extract and sort parameters alphabetically
+        const params = [];
+        searchParams.forEach((value, key) => {
+          params.push({ key, value });
+        });
+        params.sort((a, b) => a.key.localeCompare(b.key));
+
+        return {
+          id,
+          title: defaultTitle,
+          original: trimmed,
+          isValid: true,
+          protocol: parsed.protocol,
+          host: parsed.host,
+          pathname: parsed.pathname,
+          hash: parsed.hash,
+          params
+        };
+      } catch (error) {
+        return {
+          id,
+          title: defaultTitle,
+          original: trimmed,
+          isValid: false,
+          protocol: "",
+          host: "",
+          pathname: "",
+          hash: "",
+          params: [],
+          error: "Formato de URL inválido o corrupto."
+        };
+      }
+    }
+
+    /**
+     * Translates values according to displayMode (normal, URLencoded, hex)
+     */
+    function formatValue(value, mode) {
+      if (!value) return "";
+      switch (mode) {
+        case "hex":
+          return toHexBytes(value);
+        case "urlEncoded":
+          return encodeURIComponent(value);
+        case "normal":
+        default:
+          return value;
+      }
+    }
+
+    /**
+     * Shows customized toast instead of alerts
+     */
+    function showToast(message) {
+      const toast = document.getElementById("custom-toast");
+      document.getElementById("toast-message").textContent = message;
+      toast.classList.remove("opacity-0", "translate-y-[-100px]");
+      toast.classList.add("opacity-100", "translate-y-0");
+      
+      setTimeout(() => {
+        toast.classList.remove("opacity-100", "translate-y-0");
+        toast.classList.add("opacity-0", "translate-y-[-100px]");
+      }, 1800);
+    }
+
+    /**
+     * Copy value to clipboard (using robust fallback mechanism inside frames)
+     */
+    function copyText(text) {
+      // Legacy document execCommand strategy
+      const el = document.createElement('textarea');
+      el.value = text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+
+      // Async API strategy
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text);
+      }
+      showToast("¡Copiado al portapapeles!");
+    }
+
+    // --- UI Control Functions ---
+
+    function setInsertMode(mode) {
+      insertMode = mode;
+      const btnSingle = document.getElementById("btn-insert-single");
+      const btnBulk = document.getElementById("btn-insert-bulk");
+      const containerSingle = document.getElementById("container-single-inputs");
+      const containerBulk = document.getElementById("container-bulk-inputs");
+
+      if (mode === "single") {
+        btnSingle.className = "px-2 py-1 rounded text-[10px] font-semibold transition-all bg-slate-800 text-blue-400";
+        btnBulk.className = "px-2 py-1 rounded text-[10px] font-semibold transition-all text-slate-500 hover:text-slate-300";
+        containerSingle.classList.remove("hidden");
+        containerBulk.classList.add("hidden");
+      } else {
+        btnSingle.className = "px-2 py-1 rounded text-[10px] font-semibold transition-all text-slate-500 hover:text-slate-300";
+        btnBulk.className = "px-2 py-1 rounded text-[10px] font-semibold transition-all bg-slate-800 text-blue-400";
+        containerSingle.classList.add("hidden");
+        containerBulk.classList.remove("hidden");
+      }
+      hideFormError();
+    }
+
+    function setViewLayout(layout) {
+      viewLayout = layout;
+      const btnDetail = document.getElementById("btn-layout-detail");
+      const btnCompare = document.getElementById("btn-layout-compare");
+      const helperText = document.getElementById("layout-helper-text");
+
+      if (layout === "detail") {
+        btnDetail.className = "px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-white bg-blue-600";
+        btnCompare.className = "px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-400 hover:text-white";
+        helperText.textContent = "Haz click para seleccionar";
+      } else {
+        btnDetail.className = "px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-400 hover:text-white";
+        btnCompare.className = "px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-white bg-blue-600";
+        helperText.textContent = "Marca la casilla para comparar";
+      }
+      renderAll();
+    }
+
+    function setDisplayMode(mode) {
+      displayMode = mode;
+      const btnNormal = document.getElementById("btn-mode-normal");
+      const btnUrl = document.getElementById("btn-mode-urlEncoded");
+      const btnHex = document.getElementById("btn-mode-hex");
+
+      const activeClass = "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all bg-slate-800 text-blue-400 border border-slate-700";
+      const inactiveClass = "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all text-slate-500 hover:text-slate-300";
+
+      btnNormal.className = (mode === "normal") ? activeClass : inactiveClass;
+      btnUrl.className = (mode === "urlEncoded") ? activeClass : inactiveClass;
+      btnHex.className = (mode === "hex") ? activeClass : inactiveClass;
+
+      renderWorkspace();
+    }
+
+    function showFormError(message) {
+      const el = document.getElementById("form-error-alert");
+      const text = document.getElementById("form-error-text");
+      text.textContent = message;
+      el.classList.remove("hidden");
+    }
+
+    function hideFormError() {
+      const el = document.getElementById("form-error-alert");
+      el.classList.add("hidden");
+    }
+
+    /**
+     * Collapses or Expands the left sidepanel
+     */
+    function toggleLeftPanel() {
+      leftPanelCollapsed = !leftPanelCollapsed;
+      const panel = document.getElementById("left-panel-aside");
+      const icon = document.getElementById("collapse-icon");
+      const btn = document.getElementById("btn-collapse-left");
+
+      if (leftPanelCollapsed) {
+        panel.classList.add("lg:w-0", "w-0", "opacity-0", "pointer-events-none");
+        panel.classList.remove("lg:w-96", "w-full");
+        icon.setAttribute("data-lucide", "chevron-right");
+        btn.setAttribute("title", "Expandir panel lateral");
+        btn.classList.add("left-0");
+        btn.classList.remove("lg:left-96");
+      } else {
+        panel.classList.remove("lg:w-0", "w-0", "opacity-0", "pointer-events-none");
+        panel.classList.add("lg:w-96", "w-full");
+        icon.setAttribute("data-lucide", "chevron-left");
+        btn.setAttribute("title", "Colapsar panel lateral");
+        btn.classList.remove("left-0");
+        btn.classList.add("lg:left-96");
+      }
+      lucide.createIcons();
+    }
+
+    /**
+     * Add URL(s) to lists based on the active inputs
+     */
+    function handleFormSubmit() {
+      hideFormError();
+
+      if (insertMode === "single") {
+        const titleVal = document.getElementById("input-title").value.trim();
+        const urlVal = document.getElementById("input-url").value.trim();
+
+        if (!urlVal) {
+          showFormError("Por favor ingresa una dirección URL.");
+          return;
+        }
+
+        const newDissected = dissectSingleUrl(urlVal, titleVal || "Nueva URL");
+        urlList.push(newDissected);
+        selectedUrlId = newDissected.id;
+        compareIds.push(newDissected.id);
+
+        // Reset inputs
+        document.getElementById("input-title").value = "";
+        document.getElementById("input-url").value = "";
+
+      } else {
+        const bulkVal = document.getElementById("input-bulk").value.trim();
+        if (!bulkVal) {
+          showFormError("Por favor ingresa al menos una dirección URL.");
+          return;
+        }
+
+        const lines = bulkVal.split(/\r?\n/).filter(line => line.trim().length > 0);
+        if (lines.length === 0) {
+          showFormError("No se encontraron URLs válidas.");
+          return;
+        }
+
+        lines.forEach((line, idx) => {
+          const indexNum = urlList.length + 1;
+          const newDissected = dissectSingleUrl(line, `Importación Masiva #${indexNum}`);
+          urlList.push(newDissected);
+          compareIds.push(newDissected.id);
+          if (idx === 0) {
+            selectedUrlId = newDissected.id;
+          }
+        });
+
+        // Reset inputs
+        document.getElementById("input-bulk").value = "";
+      }
+
+      // Automatically open the panel if it was collapsed to show the output
+      if (leftPanelCollapsed) {
+        toggleLeftPanel();
+      }
+
+      renderAll();
+    }
+
+    function clearAllHistory() {
+      urlList = [];
+      selectedUrlId = null;
+      compareIds = [];
+      renderAll();
+    }
+
+    function removeUrl(id, event) {
+      if (event) event.stopPropagation();
+      urlList = urlList.filter(item => item.id !== id);
+      compareIds = compareIds.filter(cid => cid !== id);
+      if (selectedUrlId === id) {
+        selectedUrlId = urlList.length > 0 ? urlList[0].id : null;
+      }
+      renderAll();
+    }
+
+    function toggleCompareSelection(id, event) {
+      if (event) event.stopPropagation();
+      if (compareIds.includes(id)) {
+        compareIds = compareIds.filter(cid => cid !== id);
+      } else {
+        compareIds.push(id);
+      }
+      renderAll();
+    }
+
+    function selectUrl(id) {
+      selectedUrlId = id;
+      if (viewLayout === "compare" && !compareIds.includes(id)) {
+        compareIds.push(id);
+      }
+      renderAll();
+    }
+
+    // --- Inline Editable Title Logic ---
+
+    function startEditTitle(id, event) {
+      if (event) event.stopPropagation();
+      const textContainer = document.getElementById(`title-text-container-${id}`);
+      const currentTitle = textContainer.getAttribute("data-title");
+
+      // Replace text node with input element inline
+      textContainer.innerHTML = `
+        <input 
+          type="text" 
+          id="title-edit-input-${id}" 
+          value="${currentTitle}" 
+          class="bg-slate-800 border border-blue-500 rounded text-xs px-1.5 py-0.5 text-white font-semibold w-full focus:outline-none"
+          onclick="event.stopPropagation()"
+          onkeydown="handleTitleKeydown('${id}', event)"
+          onblur="saveTitleEdit('${id}')"
+        />
+      `;
+      const input = document.getElementById(`title-edit-input-${id}`);
+      input.focus();
+      input.select();
+    }
+
+    function saveTitleEdit(id) {
+      const input = document.getElementById(`title-edit-input-${id}`);
+      if (!input) return;
+
+      const newTitle = input.value.trim() || "URL Sin Título";
+      const item = urlList.find(u => u.id === id);
+      if (item) {
+        item.title = newTitle;
+      }
+      renderAll();
+    }
+
+    function handleTitleKeydown(id, event) {
+      if (event.key === "Enter") {
+        saveTitleEdit(id);
+      } else if (event.key === "Escape") {
+        renderAll();
+      }
+    }
+
+
+    // --- RENDER FUNCTIONS ---
+
+    /**
+     * Renders Left Panel: Sidebar containing history of URLs
+     */
+    function renderSidebar() {
+      const container = document.getElementById("history-list-container");
+      const totalCount = document.getElementById("history-total-count");
+      const compareCount = document.getElementById("compare-badge-count");
+
+      totalCount.textContent = urlList.length;
+      compareCount.textContent = compareIds.length;
+
+      if (urlList.length === 0) {
+        container.innerHTML = `
+          <div class="flex-1 flex flex-col items-center justify-center text-center p-6 border border-dashed border-slate-800 rounded-xl bg-slate-900/20">
+            <i data-lucide="globe" class="w-8 h-8 text-slate-600 mb-2 animate-pulse"></i>
+            <p class="text-xs text-slate-400">Lista vacía.</p>
+            <p class="text-[11px] text-slate-500 mt-1">Sube URLs en el formulario superior.</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      container.innerHTML = "";
+      urlList.forEach((item) => {
+        const isSelected = item.id === selectedUrlId;
+        const isCompared = compareIds.includes(item.id);
+
+        let borderClass = "bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900";
+        if (viewLayout === "compare") {
+          borderClass = isCompared 
+            ? "bg-blue-950/20 border-blue-600/60 shadow-md"
+            : "bg-slate-900/40 border-slate-800 hover:border-slate-700";
+        } else {
+          borderClass = isSelected
+            ? "bg-blue-950/40 border-blue-500/50 shadow-inner"
+            : "bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900";
+        }
+
+        const card = document.createElement("div");
+        card.className = `group relative p-3 rounded-xl border transition-all cursor-pointer ${borderClass}`;
+        card.setAttribute("onclick", `selectUrl('${item.id}')`);
+
+        // Checkbox representation inside compare vs standard protocol tags
+        let selectionControl = "";
+        if (viewLayout === "compare") {
+          selectionControl = `
+            <button
+              onclick="toggleCompareSelection('${item.id}', event)"
+              class="text-slate-400 hover:text-white transition-colors focus:outline-none"
+              title="${isCompared ? 'Desmarcar para comparar' : 'Seleccionar para comparar'}"
+            >
+              <i data-lucide="${isCompared ? 'check-square' : 'square'}" class="w-4 h-4 ${isCompared ? 'text-emerald-400' : 'text-slate-650'}"></i>
+            </button>
+          `;
+        } else {
+          const statusText = item.isValid ? item.protocol.replace(":", "") : "Error";
+          const statusColor = item.isValid 
+            ? "bg-emerald-950/85 text-emerald-400 border border-emerald-800/80" 
+            : "bg-red-950/85 text-red-400 border border-red-800/80";
+          selectionControl = `
+            <span class="text-[9px] font-mono px-1.5 py-0.5 rounded font-extrabold uppercase shrink-0 ${statusColor}">
+              ${statusText}
+            </span>
+          `;
+        }
+
+        card.innerHTML = `
+          <div class="flex justify-between items-center gap-2 mb-2">
+            <div class="flex items-center gap-2 overflow-hidden w-full">
+              ${selectionControl}
+              
+              <!-- Editable Title -->
+              <div class="flex items-center gap-1 overflow-hidden group/title w-full" id="title-text-container-${item.id}" data-title="${item.title}">
+                <span class="font-bold text-slate-200 text-xs truncate" title="${item.title}">
+                  ${item.title}
+                </span>
+                <button
+                  onclick="startEditTitle('${item.id}', event)"
+                  class="opacity-0 group-hover:opacity-100 group-hover/title:opacity-100 p-0.5 text-slate-400 hover:text-blue-400 rounded transition-all focus:outline-none"
+                  title="Editar Título"
+                >
+                  <i data-lucide="edit-2" class="w-3 h-3"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Delete Button -->
+            <button
+              onclick="removeUrl('${item.id}', event)"
+              class="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-red-400 rounded-md transition-all hover:bg-slate-800 shrink-0 focus:outline-none"
+              title="Eliminar URL"
+            >
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+
+          <!-- Display Host or raw URL -->
+          <div class="text-[11px] font-mono font-medium truncate text-slate-400">
+            ${item.host || item.original}
+          </div>
+
+          <div class="mt-1 text-[10px] text-slate-500 truncate font-mono flex items-center justify-between">
+            <span class="truncate pr-1">
+              ${item.pathname && item.pathname !== "/" ? item.pathname : ""}
+            </span>
+            ${item.params.length > 0 ? `
+              <span class="bg-slate-800/80 text-slate-400 px-1.5 py-0.2 rounded text-[9px] border border-slate-700/50 shrink-0 font-sans">
+                ${item.params.length} params
+              </span>
+            ` : ""}
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+
+      lucide.createIcons();
+    }
+
+    /**
+     * Renders Right Panel: Detail View or Comparative Side-by-Side
+     */
+    function renderWorkspace() {
+      const container = document.getElementById("main-content-area");
+
+      if (viewLayout === "detail") {
+        const activeUrl = urlList.find(u => u.id === selectedUrlId);
+
+        if (!activeUrl) {
+          container.innerHTML = `
+            <div class="h-full flex flex-col items-center justify-center text-center p-8">
+              <i data-lucide="settings" class="w-12 h-12 text-slate-700 mb-3 animate-spin" style="animation-duration: 15s"></i>
+              <h3 class="text-lg font-semibold text-slate-400">No hay selección activa</h3>
+              <p class="text-xs text-slate-500 max-w-sm mt-1">
+                Selecciona una URL en el panel lateral para iniciar el desglose en Vista Detalle.
+              </p>
+            </div>
+          `;
+          lucide.createIcons();
+          return;
+        }
+
+        // Host structure with prioritized visual hierarchy
+        let paramsHtml = "";
+        if (activeUrl.params.length === 0) {
+          paramsHtml = `
+            <div class="bg-slate-950/30 border border-slate-800/80 rounded-xl p-6 text-center text-slate-400 text-xs">
+              <i data-lucide="info" class="w-6 h-6 mx-auto text-slate-600 mb-2"></i>
+              Esta URL no tiene parámetros de consulta para diseccionar.
+            </div>
+          `;
+        } else {
+          paramsHtml = `
+            <div class="space-y-2">
+              ${activeUrl.params.map((param, index) => {
+                const formattedKey = formatValue(param.key, displayMode);
+                const formattedVal = formatValue(param.value, displayMode);
+                const combinedStr = `${formattedKey}=${formattedVal}`;
+                
+                return `
+                  <div class="group grid grid-cols-1 md:grid-cols-12 gap-2 bg-slate-950/30 hover:bg-slate-950/60 p-2 border border-slate-800 hover:border-slate-700/80 rounded-xl transition-all">
+                    <!-- Key -->
+                    <div class="md:col-span-4 flex items-center justify-between bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 font-mono text-xs">
+                      <span class="font-bold text-amber-400 break-all">${formattedKey}</span>
+                      <span class="text-[9px] text-slate-500 font-semibold bg-slate-950 border border-slate-800 px-1.5 py-0.5 rounded uppercase">
+                        #${index + 1}
+                      </span>
+                    </div>
+
+                    <!-- Value & Clipboard Actions -->
+                    <div class="md:col-span-8 flex items-center justify-between bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 font-mono text-xs">
+                      <span class="text-slate-300 break-all mr-2">
+                        ${formattedVal || '<span class="text-slate-600 italic">[Vacío]</span>'}
+                      </span>
+                      <div class="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onclick="copyText('${formattedVal}')"
+                          class="text-slate-500 hover:text-slate-300 p-1 hover:bg-slate-900 rounded focus:outline-none"
+                          title="Copiar Valor"
+                        >
+                          <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button
+                          onclick="copyText('${combinedStr}')"
+                          class="text-slate-500 hover:text-slate-300 p-1 hover:bg-slate-900 rounded text-[10px] flex items-center gap-1 font-semibold focus:outline-none"
+                          title="Copiar Key=Value"
+                        >
+                          <span>Copiar Par</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          `;
+        }
+
+        container.innerHTML = `
+          <div class="flex-1 p-6 overflow-y-auto">
+            <div class="space-y-6 max-w-4xl mx-auto w-full">
+              
+              <!-- URL Info Header Card -->
+              <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 rounded-full blur-3xl"></div>
+                
+                <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                      <span class="text-[10px] font-bold text-blue-400 tracking-wider uppercase">URL ANALIZADA</span>
+                      <span class="text-xs bg-slate-900 border border-slate-855 text-slate-300 px-2 py-0.5 rounded font-bold">
+                        ${activeUrl.title}
+                      </span>
+                    </div>
+                    <h3 class="text-base font-mono text-slate-100 font-semibold break-all leading-snug">
+                      ${activeUrl.original}
+                    </h3>
+                  </div>
+                  <button
+                    onclick="copyText('${activeUrl.original}')"
+                    class="shrink-0 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-slate-300 text-xs font-semibold py-1.5 px-3 rounded-lg flex items-center gap-1.5 transition-colors focus:outline-none"
+                  >
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copiar URL</span>
+                  </button>
+                </div>
+
+                ${!activeUrl.isValid ? `
+                  <div class="mt-4 p-3 bg-red-950/30 border border-red-800/50 rounded-lg text-red-300 text-xs flex items-center gap-2">
+                    <i data-lucide="info" class="w-4 h-4 shrink-0 text-red-400"></i>
+                    <span>Error: ${activeUrl.error}</span>
+                  </div>
+                ` : ""}
+              </div>
+
+              <!-- Main Disected Structure -->
+              ${activeUrl.isValid ? `
+                <div class="space-y-6">
+                  
+                  <!-- Origen Principal (Host First always) -->
+                  <div class="space-y-2">
+                    <div class="flex items-center gap-2">
+                      <i data-lucide="globe" class="w-4 h-4 text-emerald-400"></i>
+                      <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">
+                        1. Origen Principal (Host)
+                      </h4>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-3 bg-slate-950/40 p-1.5 border border-slate-800 rounded-xl">
+                      <!-- Host Row -->
+                      <div class="md:col-span-3 flex items-center bg-slate-900/80 border border-slate-800 rounded-lg px-3 py-2">
+                        <span class="text-xs font-bold text-slate-400 font-mono">HOST</span>
+                      </div>
+                      <div class="md:col-span-9 flex items-center justify-between bg-slate-950 border border-slate-800/80 rounded-lg px-4 py-2 font-mono text-xs">
+                        <span class="text-blue-400 font-semibold break-all">
+                          ${formatValue(activeUrl.host, displayMode)}
+                        </span>
+                        <button
+                          onclick="copyText('${formatValue(activeUrl.host, displayMode)}')"
+                          class="text-slate-500 hover:text-slate-300 p-1 transition-colors focus:outline-none"
+                        >
+                          <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        </button>
+                      </div>
+
+                      <!-- Path Row -->
+                      <div class="md:col-span-3 flex items-center bg-slate-900/80 border border-slate-800 rounded-lg px-3 py-2">
+                        <span class="text-xs font-bold text-slate-400 font-mono">PATHNAME</span>
+                      </div>
+                      <div class="md:col-span-9 flex items-center justify-between bg-slate-950 border border-slate-800/80 rounded-lg px-4 py-2 font-mono text-xs">
+                        <span class="text-slate-300 break-all">
+                          ${formatValue(activeUrl.pathname, displayMode) || "/"}
+                        </span>
+                        <button
+                          onclick="copyText('${formatValue(activeUrl.pathname, displayMode) || "/"}')"
+                          class="text-slate-500 hover:text-slate-300 p-1 transition-colors focus:outline-none"
+                        >
+                          <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        </button>
+                      </div>
+
+                      <!-- Hash Row (if exists) -->
+                      ${activeUrl.hash ? `
+                        <div class="md:col-span-3 flex items-center bg-slate-900/80 border border-slate-800 rounded-lg px-3 py-2">
+                          <span class="text-xs font-bold text-slate-400 font-mono">HASH (#)</span>
+                        </div>
+                        <div class="md:col-span-9 flex items-center justify-between bg-slate-950 border border-slate-800/80 rounded-lg px-4 py-2 font-mono text-xs">
+                          <span class="text-purple-400 break-all">
+                            ${formatValue(activeUrl.hash, displayMode)}
+                          </span>
+                          <button
+                            onclick="copyText('${formatValue(activeUrl.hash, displayMode)}')"
+                            class="text-slate-500 hover:text-slate-300 p-1 transition-colors focus:outline-none"
+                          >
+                            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                          </button>
+                        </div>
+                      ` : ""}
+                    </div>
+                  </div>
+
+                  <!-- Query Parameters (Sorted Alphabetically) -->
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center gap-2">
+                        <i data-lucide="layers" class="w-4 h-4 text-blue-400"></i>
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">
+                          2. Parámetros de Consulta (Orden Alfabético)
+                        </h4>
+                      </div>
+                      <span class="text-xs font-mono bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700">
+                        ${activeUrl.params.length} parámetro(s)
+                      </span>
+                    </div>
+
+                    ${paramsHtml}
+                  </div>
+
+                </div>
+              ` : ""}
+
+            </div>
+          </div>
+        `;
+        lucide.createIcons();
+
+      } else {
+        // --- COMPARE SIDE-BY-SIDE MODE ---
+        const comparedUrls = urlList.filter(u => compareIds.includes(u.id));
+
+        if (comparedUrls.length === 0) {
+          container.innerHTML = `
+            <div class="flex-1 flex flex-col items-center justify-center text-center p-8">
+              <i data-lucide="columns" class="w-12 h-12 text-slate-700 mb-3"></i>
+              <h3 class="text-base font-semibold text-slate-400">No hay URLs seleccionadas para comparar</h3>
+              <p class="text-xs text-slate-500 max-w-sm mt-1">
+                Haz clic en las casillas de verificación (checkboxes) del panel izquierdo para agregarlas a esta vista de comparación.
+              </p>
+            </div>
+          `;
+          lucide.createIcons();
+          return;
+        }
+
+        // Generate Grid Columns
+        let columnsHtml = "";
+        comparedUrls.forEach((url) => {
+          let paramRows = "";
+          if (url.params.length === 0) {
+            paramRows = `
+              <div class="bg-slate-900/45 border border-dashed border-slate-800 rounded-xl p-4 text-center text-[11px] text-slate-500">
+                Sin parámetros de consulta.
+              </div>
+            `;
+          } else {
+            paramRows = `
+              <div class="space-y-1.5">
+                ${url.params.map((param, idx) => {
+                  const fKey = formatValue(param.key, displayMode);
+                  const fVal = formatValue(param.value, displayMode);
+                  
+                  return `
+                    <div class="bg-slate-900/70 hover:bg-slate-900 border border-slate-800 hover:border-slate-750 p-2 rounded-lg flex flex-col gap-0.5 group/param transition-all">
+                      <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold text-amber-500 font-mono truncate" title="${fKey}">
+                          ${fKey}
+                        </span>
+                        <span class="text-[9px] text-slate-500 font-bold bg-slate-950 px-1.5 rounded">
+                          #${idx + 1}
+                        </span>
+                      </div>
+                      
+                      <div class="flex items-center justify-between mt-1 gap-1 bg-slate-950 p-1.5 rounded border border-slate-850">
+                        <span class="text-xs font-mono text-slate-300 truncate" title="${fVal}">
+                          ${fVal || '<span class="text-slate-600 italic text-[10px]">[vacío]</span>'}
+                        </span>
+                        <button
+                          onclick="copyText('${fVal}')"
+                          class="opacity-0 group-hover/param:opacity-100 p-0.5 text-slate-500 hover:text-white rounded hover:bg-slate-900 transition-all shrink-0 focus:outline-none"
+                          title="Copiar Valor"
+                        >
+                          <i data-lucide="copy" class="w-3 h-3"></i>
+                        </button>
+                      </div>
+                    </div>
+                  `;
+                }).join("")}
+              </div>
+            `;
+          }
+
+          columnsHtml += `
+            <div class="w-80 md:w-96 shrink-0 bg-slate-950/60 border border-slate-800 rounded-2xl flex flex-col overflow-hidden self-stretch shadow-lg">
+              
+              <!-- Column Header -->
+              <div class="p-4 bg-slate-950 border-b border-slate-800 relative">
+                <div class="flex items-start justify-between gap-2 mb-1.5">
+                  <span class="text-xs font-extrabold text-blue-400 truncate max-w-[80%]" title="${url.title}">
+                    ${url.title}
+                  </span>
+                  <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-900 shrink-0">
+                    ${url.protocol ? url.protocol.replace(":", "") : "https"}
+                  </span>
+                </div>
+                <p class="text-[10px] font-mono text-slate-500 truncate mb-2" title="${url.original}">
+                  ${url.original}
+                </p>
+                <button
+                  onclick="copyText('${url.original}')"
+                  class="w-full bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[10px] py-1 rounded font-semibold text-slate-400 hover:text-white flex items-center justify-center gap-1 transition-all focus:outline-none"
+                >
+                  <i data-lucide="copy" class="w-3 h-3"></i>
+                  <span>Copiar URL Completa</span>
+                </button>
+              </div>
+
+              <!-- Content details -->
+              <div class="p-4 space-y-4 flex-1 overflow-y-auto">
+                
+                <!-- Main Host Detail (Always First) -->
+                <div class="space-y-1.5">
+                  <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">
+                    1. Host Principal
+                  </span>
+                  <div class="bg-slate-900 border border-slate-800 rounded-xl p-2.5 space-y-1">
+                    <div class="flex items-center justify-between gap-1">
+                      <span class="text-[10px] font-semibold text-slate-500 font-mono">HOST</span>
+                      <span class="text-xs font-mono font-bold text-blue-400 truncate" title="${url.host}">
+                        ${formatValue(url.host, displayMode)}
+                      </span>
+                    </div>
+                    <div class="flex items-center justify-between gap-1 pt-1 border-t border-slate-800">
+                      <span class="text-[10px] font-semibold text-slate-500 font-mono">PATH</span>
+                      <span class="text-xs font-mono text-slate-300 truncate" title="${url.pathname || '/'}">
+                        ${formatValue(url.pathname, displayMode) || "/"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Query Parameters list -->
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">
+                      2. Parámetros de Consulta
+                    </span>
+                    <span class="text-[9px] font-mono text-slate-400 bg-slate-900 border border-slate-800 px-1 py-0.2 rounded">
+                      ${url.params.length} items
+                    </span>
+                  </div>
+
+                  ${paramRows}
+                </div>
+
+              </div>
+            </div>
+          `;
+        });
+
+        container.innerHTML = `
+          <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header bar inside compare layout -->
+            <div class="bg-slate-950/40 border-b border-slate-800 p-4 flex justify-between items-center shrink-0">
+              <div>
+                <h3 class="text-sm font-bold text-slate-200">Comparativa Side-by-Side</h3>
+                <p class="text-[11px] text-slate-400">Contrasta múltiples flujos de parámetros alineados en paralelo.</p>
+              </div>
+              <div class="text-xs text-slate-500">
+                <span class="bg-slate-800 border border-slate-700 text-slate-300 px-2 py-1 rounded font-mono">
+                  ${comparedUrls.length} seleccionadas
+                </span>
+              </div>
+            </div>
+
+            <!-- Scrollable columns viewport -->
+            <div class="flex-1 overflow-x-auto overflow-y-auto p-4">
+              <div class="flex gap-4 items-start min-h-full pb-4">
+                ${columnsHtml}
+              </div>
+            </div>
+          </div>
+        `;
+        lucide.createIcons();
+      }
+    }
+
+    function renderAll() {
+      renderSidebar();
+      renderWorkspace();
+    }
+
+    // --- On Load Init ---
+    window.onload = function() {
+      renderAll();
+    };
+  </script>
+</body>
+</html>
